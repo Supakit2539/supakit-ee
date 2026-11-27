@@ -629,8 +629,10 @@ const path = require('path');
       const am = await mp.evaluate(() => { const xs = [], y = []; for (let k = 0; k <= 1000; k++){ xs.push(k*1e-4); y.push(325*Math.sin(2*Math.PI*50*k*1e-4)); } const m = spMeas(xs, y);
         __sim.load(__sim.EX.pfc.f()); AN.sig = null; anOpen(); const ids = [...document.querySelectorAll('#anwin .anlist label')].map(l => l.textContent.trim()); AN.pt = 'I'; anPtApply($('#anwin'));
         const vis = [...document.querySelectorAll('#anwin .anlist label')].filter(l => l.style.display !== 'none').map(l => l.textContent.trim()); AN.pt = ''; $('#anwin').hidden = true;
-        return {avg:+m.avg.toFixed(2), rms:+m.rms.toFixed(1), defI:AN.probes.some(x => x.startsWith('I(')), vis:vis.length > 0 && vis.every(x => x.startsWith('I(')), all:ids.length > vis.length}; });
-      checks.push(['วิเคราะห์ SPICE: ไซน์ 325 V ครึ่งคาบเกิน → เฉลี่ย 0 V, RMS 230 V (นับเฉพาะคาบเต็ม) · ปุ่มกรองโพรบ "กระแส I" + โพรบกระแสตั้งต้น', Math.abs(am.avg) < 0.5 && Math.abs(am.rms - 229.8) < 0.5 && am.defI && am.vis && am.all, JSON.stringify(am)]);
+        __sim.load(__sim.EX.series.f()); const rs = spRun({kind:'tran', probes:['I(B1)', 'P(B1)'], tstop:0.04, tstep:1e-4}), tot = rs.ys.map(y => +spMeas(rs.xs, y).avg.toFixed(3));
+        __sim.load(__sim.EX.home.f()); AN.sig = null; anDefaults(); const defSrc = AN.probes.includes('I(การไฟฟ้า)');
+        return {tot, defSrc, avg:+m.avg.toFixed(2), rms:+m.rms.toFixed(1), defI:AN.probes.some(x => x.startsWith('I(')), vis:vis.length > 0 && vis.every(x => x.startsWith('I(')), all:ids.length > vis.length}; });
+      checks.push(['วิเคราะห์ SPICE: ไซน์ 325 V ครึ่งคาบเกิน → เฉลี่ย 0 V, RMS 230 V (นับเฉพาะคาบเต็ม) · ปุ่มกรองโพรบ "กระแส I" + โพรบกระแสตั้งต้น · กระแสรวมจากแหล่งจ่าย I(B1) = +0.25 A, P = 3 W, ไฟบ้านตั้งต้น I(การไฟฟ้า)', Math.abs(am.avg) < 0.5 && am.tot[0] === 0.25 && Math.abs(am.tot[1] - 3) < 0.01 && am.defSrc && Math.abs(am.rms - 229.8) < 0.5 && am.defI && am.vis && am.all, JSON.stringify(am)]);
     await mctx.close(); }
   const ed = await page.evaluate(async () => { const s = __sim, o = {};
     // เลือกหลายชิ้น + คัดลอก/วาง + ย้อนกลับ/ทำซ้ำ + ย้ายทั้งชุด

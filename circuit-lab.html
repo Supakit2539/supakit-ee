@@ -8139,8 +8139,11 @@ function spOP(net, T, x0){
 function spProbes(net){
   const L = [];
   for (const c of S.comps){ const n = net.pins.get(c); if (!n || c.t === 'gnd') continue; const nm = c.n || c.t, el = net.comp.get(c), pl = pinsOf(c);
-    if (isTwo(c)){ L.push({id:'V(' + nm + ')', u:'V', a:n[0], b:n[1], c}); if (el) L.push({id:'I(' + nm + ')', u:'A', el, c}); L.push({id:'P(' + nm + ')', u:'W', a:n[0], b:n[1], el, c, pw:true}); }
+    // แหล่งจ่าย (SP_SRC): I/P เป็นบวกเมื่อจ่ายออก = กระแสรวม/กำลังรวมที่วงจรใช้
+    const neg = SP_SRC.has(c.t);
+    if (isTwo(c)){ L.push({id:'V(' + nm + ')', u:'V', a:n[0], b:n[1], c}); if (el) L.push({id:'I(' + nm + ')', u:'A', el, c, neg}); L.push({id:'P(' + nm + ')', u:'W', a:n[0], b:n[1], el, c, pw:true, neg}); }
     else { pl.forEach((p, k) => { if (p[2] && !(c.t === 'scope' && k === 2)) L.push({id:'V(' + nm + '.' + p[2] + ')', u:'V', a:n[k], b:0, c}); });
+      if (neg && el){ L.push({id:'I(' + nm + ')', u:'A', el, c, neg}, {id:'P(' + nm + ')', u:'W', a:n[0], b:n[1], el, c, pw:true, neg}); }
       if (c.t === 'scope') L.push({id:'V(' + nm + '.CH1−⏚)', u:'V', a:n[0], b:n[2], c}, {id:'V(' + nm + '.CH2−⏚)', u:'V', a:n[1], b:n[2], c});
       if (el && (el.k === 'Q' || el.k === 'M' || el.k === 'OA' || el.k === 'REG' || el.k === 'L317' || el.k === 'XF' || el.k === 'D')) L.push({id:'I(' + nm + ')', u:'A', el, c}); } }
   return L;
@@ -8149,9 +8152,10 @@ function spElI(e, x){ const V = k => k ? x[k - 1] : 0;
   if (e.j !== undefined && (e.k === 'V' || e.k === 'L' || e.k === 'XF')) return x[e.j];
   if (e.k === 'R2'){ const y = admit(e.c, false, 0); return (y ? y[0] : 0)*(V(e.a) - V(e.b)); }
   return e.k === 'REG' || e.k === 'L317' ? e.io : e.i || 0; }
-function spProbeVal(P, x){ const V = k => k ? x[k - 1] : 0;
-  if (P.pw) return (V(P.a) - V(P.b))*(P.el ? spElI(P.el, x) : 0);
-  if (P.el) return spElI(P.el, x);
+const SP_SRC = new Set(['bat', 'acs', 'src1', 'fgen']);
+function spProbeVal(P, x){ const V = k => k ? x[k - 1] : 0, sg = P.neg ? -1 : 1;
+  if (P.pw) return sg*(V(P.a) - V(P.b))*(P.el ? spElI(P.el, x) : 0);
+  if (P.el) return sg*spElI(P.el, x);
   return V(P.a) - V(P.b); }
 // ---------- การวิเคราะห์ ----------
 function spRun(opt){
@@ -8324,7 +8328,8 @@ function anDefaults(){
     const pick = [];
     for (const c of S.comps) if (c.t === 'scope'){ pick.push('V(' + c.n + '.CH1−⏚)'); if (c.on2 !== false) pick.push('V(' + c.n + '.CH2−⏚)'); }
     if (!pick.length){ for (const c of S.comps) if (['led', 'res', 'cap', 'diode', 'lamp'].includes(c.t) && pick.length < 2) pick.push('V(' + c.n + ')');
-      const ld = S.comps.find(c => ['res', 'lamp', 'led', 'diode', 'ind'].includes(c.t)), ip = ld ? 'I(' + ld.n + ')' : (pr.find(p => p.id.startsWith('I(')) || {}).id;
+      const sr = S.comps.find(c => SP_SRC.has(c.t) && pr.some(p => p.id === 'I(' + c.n + ')')), ld = S.comps.find(c => ['res', 'lamp', 'led', 'diode', 'ind'].includes(c.t));
+      const ip = sr ? 'I(' + sr.n + ')' : ld ? 'I(' + ld.n + ')' : (pr.find(p => p.id.startsWith('I(')) || {}).id;
       if (ip) pick.push(ip); }
     AN.probes = pick.filter(id => pr.some(p => p.id === id)); }
   const srcs = S.comps.filter(c => ['bat', 'acs', 'src1', 'fgen'].includes(c.t));
@@ -8364,7 +8369,7 @@ function anUI(){
     <div class="anbody"><div class="anprobe"><input data-an="filter" placeholder="ค้นหาโพรบ…" value="${esc(AN.filter || '')}">
       <div class="anpt">${AN_PT.map(([a, b]) => `<button class="btn${(AN.pt || '') === a ? ' on' : ''}" data-aa="pt:${a}">${b}</button>`).join('')}</div><div class="anlist">${pr.filter(p => anPtOk(p.id, q)).map(p =>
       `<label><input type="checkbox" data-pr="${esc(p.id)}" ${AN.probes.includes(p.id) ? 'checked' : ''}>${esc(p.id)}</label>`).join('')}</div>
-      <div class="anhint">V(ชื่อ) = แรงดันคร่อม · V(ชื่อ.ขา) = เทียบกราวด์ · I = กระแส · P = กำลัง</div></div>
+      <div class="anhint">V(ชื่อ) = แรงดันคร่อม · V(ชื่อ.ขา) = เทียบกราวด์ · I = กระแส · P = กำลัง · I/P ของแหล่งจ่าย = กระแส/กำลังรวมที่จ่ายให้วงจร</div></div>
       <div class="anplot">${k === 'op' ? '<div id="antab"></div>' : '<canvas id="anv"></canvas>'}<div id="anmeas"></div></div></div>
     <div id="anmsg">${anMsg()}</div><div id="annet" hidden></div>`;
   anDraw();
