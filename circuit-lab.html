@@ -8325,7 +8325,7 @@ const fgenSpice = c => { const A = c.vpp/2, f = c.f || 1000, off = c.off || 0, d
   return `SIN(${off} ${A} ${f} 0 0 ${c.ph || 0}) AC 1`; };
 
 // ---------- หน้าต่าง "วิเคราะห์วงจร" ----------
-const AN = {mc:{n:0, tolR:5, tolC:10, seed:1}, kind:'tran', temp:27, probes:null, res:null, dc:{comp:'', param:'V', from:0, to:10, pts:51}, ac:{src:'', from:10, to:1e6, ppd:20},
+const AN = {ov:true, mc:{n:0, tolR:5, tolC:10, seed:1}, kind:'tran', temp:27, probes:null, res:null, dc:{comp:'', param:'V', from:0, to:10, pts:51}, ac:{src:'', from:10, to:1e6, ppd:20},
   tran:{tstop:0.05, tstep:5e-5, uic:false}, four:{f0:0, nh:9}, hover:null};
 const AN_KIND = {op:'จุดทำงาน DC', dc:'กวาด DC / พารามิเตอร์ / อุณหภูมิ', ac:'ตอบสนองความถี่ AC (Bode)', tran:'ชั่วคราว (ตามเวลา)', four:'ฟูเรียร์ / THD'};
 // กรองโพรบตามชนิด: '' ทั้งหมด · V แรงดัน · I กระแส · P กำลัง
@@ -8379,7 +8379,7 @@ function anUI(){
     <button class="btn" data-aa="csv" title="ส่งออกข้อมูลเป็น CSV">CSV</button><button class="btn" data-aa="png" title="บันทึกกราฟเป็นภาพ">PNG</button><button class="btn" data-aa="net" title="netlist สำหรับ ngspice / LTspice">Netlist</button><button class="btn" data-aa="close">✕</button></div>
     <div class="swc">${par}</div>
     <div class="anbody"><div class="anprobe"><input data-an="filter" placeholder="ค้นหาโพรบ…" value="${esc(AN.filter || '')}">
-      <div class="anpt">${AN_PT.map(([a, b]) => `<button class="btn${(AN.pt || '') === a ? ' on' : ''}" data-aa="pt:${a}">${b}</button>`).join('')}</div><div class="anlist">${pr.filter(p => anPtOk(p.id, q)).map(p =>
+      <div class="anpt">${AN_PT.map(([a, b]) => `<button class="btn${(AN.pt || '') === a ? ' on' : ''}" data-aa="pt:${a}">${b}</button>`).join('')}<button class="btn${AN.ov ? ' on' : ''}" data-aa="ov" title="แสดง V, A, W ซ้อนกันในกราฟเดียว (แต่ละหน่วยมีสเกลของตัวเอง)">⧉ รวมช่อง</button></div><div class="anlist">${pr.filter(p => anPtOk(p.id, q)).map(p =>
       `<label><input type="checkbox" data-pr="${esc(p.id)}" ${AN.probes.includes(p.id) ? 'checked' : ''}>${esc(p.id)}</label>`).join('')}</div>
       <div class="anhint">V(ชื่อ) = แรงดันคร่อม · V(ชื่อ.ขา) = เทียบกราวด์ · I = กระแส · P = กำลัง · I/P ของแหล่งจ่าย = กระแส/กำลังรวมที่จ่ายให้วงจร</div></div>
       <div class="anplot">${k === 'op' ? '<div id="antab"></div>' : '<canvas id="anv"></canvas>'}<div id="anmeas"></div></div></div>
@@ -8431,6 +8431,14 @@ function anRun(){
 function niceTicks(a, b, n){ if (!(b > a)){ const d = Math.abs(a) || 1; a -= d*0.5; b += d*0.5; }
   const st = Math.pow(10, Math.floor(Math.log10((b - a)/n))), m = (b - a)/n/st, s = (m > 5 ? 10 : m > 2 ? 5 : m > 1 ? 2 : 1)*st, t = [];
   for (let v = Math.ceil(a/s)*s; v <= b + s*1e-9; v += s) t.push(Math.abs(v) < s*1e-9 ? 0 : v); return {lo:Math.min(a, t[0] ?? a), hi:Math.max(b, t[t.length - 1] ?? b), t}; }
+// สเกลซ้อนช่อง: ทุกหน่วยใช้กริด D ช่องเดียวกัน ศูนย์อยู่ที่ช่อง k ร่วมกัน, ช่องละ s[j] (1-2-5) — เลือก k ให้กราฟเต็มช่องมากที่สุด
+function anOvScale(rg, D){ const nice = x => { if (!(x > 0)) return 1; const e = Math.pow(10, Math.floor(Math.log10(x))), m = x/e; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10)*e; };
+  let best = null;
+  for (let k = 0; k <= D; k++){ const s = rg.map(([a, b]) => { if (!isFinite(a)) return 1; if (a === b){ const d = Math.abs(a) || 1; a -= d; b += d; }
+      const need = Math.max(a < 0 ? (k ? -a/k : Infinity) : 0, b > 0 ? (D - k ? b/(D - k) : Infinity) : 0); return isFinite(need) ? nice(need*1.0001) : Infinity; });
+    if (s.some(v => !isFinite(v))) continue; const fill = rg.reduce((q, [a, b], j) => q + (isFinite(a) ? (b - a)/(s[j]*D) : 0), 0);
+    if (!best || fill > best.fill) best = {k, s, fill}; }
+  return best || {k:D/2, s:rg.map(() => 1)}; }
 function fmtAx(v, u){ return fmt(v, u).replace(' ', ''); }
 function anDraw(){
   const r = AN.res, k = AN.kind;
@@ -8447,11 +8455,26 @@ function anDraw(){
   else if (k === 'four'){ panels.push({u:'V', tr:r.sel.map((p, i) => ({nm:p.id, y:r.ys[i], col:AN_COL[i % 8]}))}); }
   else { const by = new Map(); r.sel.forEach((p, i) => { if (!by.has(p.u)) by.set(p.u, []); by.get(p.u).push({nm:p.id, y:r.ys[i], col:AN_COL[i % 8], mc:(r.mc || []).map(m => m.ys[i])}); }); for (const [u, tr] of by) panels.push({u, tr}); }
   if (!panels.length || !panels[0].tr.length){ g.fillStyle = K.muted; g.textAlign = 'center'; g.font = "13px 'IBM Plex Sans Thai',sans-serif"; g.fillText('เลือกโพรบอย่างน้อย 1 ตัว', W/2, H/2); return; }
-  const logx = k === 'ac', xs = r.xs, X0 = xs[0], X1 = xs[xs.length - 1], L = 64, Rr = 12, top = 8, bot = 26, ph = (H - top - bot)/panels.length;
+  // รวมช่อง: ทุกหน่วย (V, A, W …) ซ้อนในกราฟเดียว แต่ละหน่วยมีสเกลของตัวเองบนเส้นกริดชุดเดียวกัน (ศูนย์ร่วมกัน) — ป้ายซ้าย = หน่วยแรก, ขวา = หน่วยที่เหลือ
+  const ov = AN.ov && k !== 'ac' && k !== 'four' && panels.length > 1;
+  if (ov) panels.splice(0, panels.length, {u:panels[0].u, tr:panels.flatMap(P => P.tr.map(t => Object.assign(t, {u:P.u}))), units:panels.map(P => P.u)});
+  const logx = k === 'ac', xs = r.xs, X0 = xs[0], X1 = xs[xs.length - 1], L = 64, Rr = ov ? 58 : 12, top = ov ? 16 : 8, bot = 26, ph = (H - top - bot)/panels.length;
   const xmap = v => L + (logx ? Math.log10(v/X0)/Math.log10(X1/X0) : (v - X0)/((X1 - X0) || 1))*(W - L - Rr);
   g.font = "10.5px 'IBM Plex Mono',monospace"; g.lineWidth = 1;
   const xu = k === 'ac' ? 'Hz' : k === 'dc' ? (AN.dc.param === 'temp' ? '°C' : '') : 's';
   panels.forEach((P, pi) => { const y0 = top + pi*ph, y1 = y0 + ph - 14; let lo = Infinity, hi = -Infinity;
+    if (P.units){ const D = 8, sc = anOvScale(P.units.map(u => { let a = Infinity, b2 = -Infinity; for (const t of P.tr) if (t.u === u) for (const yy of [t.y, ...(t.mc || [])]) for (const v of yy) if (isFinite(v)){ a = Math.min(a, v); b2 = Math.max(b2, v); } return [a, b2]; }), D);
+      const yd = d => y1 - d/D*(y1 - y0); P.ym = v => yd(sc.k + v/sc.s[0]);
+      for (const t of P.tr){ const j = P.units.indexOf(t.u); t.ym = v => yd(sc.k + v/sc.s[j]); }
+      g.textBaseline = 'middle';
+      for (let d = 0; d <= D; d++){ const y = yd(d); g.strokeStyle = K.line; g.globalAlpha = d === sc.k ? 1 : 0.6; g.beginPath(); g.moveTo(L, y); g.lineTo(W - Rr, y); g.stroke(); g.globalAlpha = 1;
+        P.units.forEach((u, j) => { const v = (d - sc.k)*sc.s[j], col = P.tr.find(t => t.u === u).col; g.fillStyle = col;
+          if (j === 0){ g.textAlign = 'right'; g.fillText(fmtAx(v, u), L - 4, y); } else { g.textAlign = 'left'; g.fillText(fmtAx(v, u), W - Rr + 4, y + (j - 1 - (P.units.length - 2)/2)*11); } }); }
+      g.strokeStyle = K.muted; g.strokeRect(L, y0, W - L - Rr, y1 - y0);
+      for (const t of P.tr){ g.strokeStyle = t.col; g.lineWidth = 1.6; g.beginPath(); let pen = false; const step = Math.max(1, Math.floor(xs.length/(W*2)));
+        for (let i = 0; i < xs.length; i += step){ const v = t.y[i]; if (!isFinite(v)){ pen = false; continue; } const X = xmap(xs[i]), Y = t.ym(v); if (pen) g.lineTo(X, Y); else { g.moveTo(X, Y); pen = true; } }
+        g.stroke(); g.lineWidth = 1; }
+      return; }
     for (const t of P.tr) for (const yy of [t.y, ...(t.mc || [])]) for (const v of yy) if (isFinite(v)){ lo = Math.min(lo, v); hi = Math.max(hi, v); }
     const tk = niceTicks(lo, hi, 5); lo = tk.lo; hi = tk.hi; const ym = v => y1 - (v - lo)/((hi - lo) || 1)*(y1 - y0); P.ym = ym; P.y0 = y0; P.y1 = y1;
     g.strokeStyle = K.line; g.fillStyle = K.muted; g.textAlign = 'right'; g.textBaseline = 'middle';
@@ -8472,7 +8495,7 @@ function anDraw(){
   // เคอร์เซอร์อ่านค่า
   let hi = AN.hover != null ? Math.max(0, Math.min(xs.length - 1, AN.hover)) : null;
   if (hi != null){ const X = xmap(xs[hi]); g.strokeStyle = K.text; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(X, top); g.lineTo(X, H - bot); g.stroke(); g.setLineDash([]);
-    panels.forEach(P => P.tr.forEach(t => { const v = t.y[hi]; if (!isFinite(v)) return; g.fillStyle = t.col; g.beginPath(); g.arc(X, P.ym(v), 3.5, 0, 7); g.fill(); })); }
+    panels.forEach(P => P.tr.forEach(t => { const v = t.y[hi]; if (!isFinite(v)) return; g.fillStyle = t.col; g.beginPath(); g.arc(X, (t.ym || P.ym)(v), 3.5, 0, 7); g.fill(); })); }
   // ตำนาน + ค่าวัด
   if (meas){ const rows = [];
     if (k === 'tran') r.sel.forEach((p, i) => { const m = r.meas[i], u = p.u; rows.push(`<div class="mr" style="border-left:3px solid ${AN_COL[i % 8]};padding-left:5px"><b>${esc(p.id)}</b><span>${hi != null ? '@ ' + fmtAx(xs[hi], 's') + ' = ' + fmt(r.ys[i][hi], u) + ' · ' : ''}ต่ำสุด ${fmt(m.min, u)} · สูงสุด ${fmt(m.max, u)} · p-p ${fmt(m.pp, u)} · เฉลี่ย ${fmt(m.avg, u)} · RMS ${fmt(m.rms, u)}${m.f ? ' · f ' + fmt(m.f, 'Hz') : ''}</span></div>`); });
@@ -8503,6 +8526,7 @@ async function anSave(name, data, type){
   const el = $('#anwin');
   el.addEventListener('click', e => { const b = e.target.closest('[data-aa]'); if (!b) return; const a = b.dataset.aa;
     if (a === 'close') el.hidden = true;
+    if (a === 'ov'){ AN.ov = !AN.ov; b.classList.toggle('on', AN.ov); anDraw(); return; }
     if (a.startsWith('pt:')){ AN.pt = a.slice(3); el.querySelectorAll('[data-aa^="pt:"]').forEach(x => x.classList.toggle('on', x === b)); anPtApply(el); return; }
     if (a === 'run'){ anRun(); if (phone()){ const pl = el.querySelector('.anplot'); if (pl){ const hh = el.querySelector('.swh').offsetHeight; el.scrollTo({top:pl.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - hh - 6, behavior:'smooth'}); } } }
     if (a === 'csv'){ const t = anCSV(); if (!t) return; clipWrite(t); anSave('circuit-lab-' + AN.kind + '.csv', '\ufeff' + t, 'text/csv'); }
