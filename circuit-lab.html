@@ -138,6 +138,7 @@ input:focus,select:focus,textarea:focus,.btn:focus-visible{outline:2px solid var
 #anwin .swc input,#anwin .swc select{width:100%}
 .anbody{display:grid;grid-template-columns:230px minmax(0,1fr);gap:8px;padding:0 10px 6px}
 .anprobe{display:flex;flex-direction:column;gap:4px;min-width:0}
+.anpt{display:flex;gap:4px;flex-wrap:wrap}.anpt .btn{padding:2px 8px;font-size:12px}
 .anlist{max-height:330px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:4px;font:11.5px 'IBM Plex Mono',monospace}
 .anlist label{display:flex;gap:5px;align-items:center;padding:1px 2px;white-space:nowrap;cursor:pointer}
 .anhint{font-size:11px;color:var(--muted)}
@@ -8230,6 +8231,11 @@ function spMeas(xs, y){
   const avg = s/cnt, mid = (mn + mx)/2; let f = 0, cr = [];
   if (mx - mn > 1e-9) for (let i = i0 + 1; i < n; i++) if (y[i - 1] < mid && y[i] >= mid) cr.push(xs[i - 1] + (mid - y[i - 1])/(y[i] - y[i - 1])*(xs[i] - xs[i - 1]));
   if (cr.length >= 2) f = (cr.length - 1)/(cr[cr.length - 1] - cr[0]);
+  // สัญญาณเป็นคาบ: เฉลี่ย/RMS เฉพาะช่วงคาบเต็ม (ระหว่างจุดตัดแรก–สุดท้าย ถ่วงตามเวลา) ไม่เช่นนั้นครึ่งคาบที่เกินมาทำให้ค่าเฉลี่ยเพี้ยน
+  if (cr.length >= 2){ const ta = cr[0], tb = cr[cr.length - 1], at = (i, t) => y[i - 1] + (y[i] - y[i - 1])*(t - xs[i - 1])/((xs[i] - xs[i - 1]) || 1); let A = 0, A2 = 0;
+    for (let i = i0 + 1; i < n; i++){ const a = Math.max(xs[i - 1], ta), b2 = Math.min(xs[i], tb); if (b2 <= a) continue; const va = at(i, a), vb = at(i, b2), h = b2 - a;
+      A += (va + vb)/2*h; A2 += (va*va + va*vb + vb*vb)/3*h; }
+    return {min:mn, max:mx, pp:mx - mn, avg:A/(tb - ta), rms:Math.sqrt(A2/(tb - ta)), f}; }
   return {min:mn, max:mx, pp:mx - mn, avg, rms:Math.sqrt(s2/cnt), f};
 }
 // ฟูเรียร์: ใช้คาบเต็มล่าสุด (สุ่มใหม่สม่ำเสมอ) → ฮาร์มอนิก 0..nh, THD
@@ -8306,6 +8312,10 @@ const fgenSpice = c => { const A = c.vpp/2, f = c.f || 1000, off = c.off || 0, d
 const AN = {mc:{n:0, tolR:5, tolC:10, seed:1}, kind:'tran', temp:27, probes:null, res:null, dc:{comp:'', param:'V', from:0, to:10, pts:51}, ac:{src:'', from:10, to:1e6, ppd:20},
   tran:{tstop:0.05, tstep:5e-5, uic:false}, four:{f0:0, nh:9}, hover:null};
 const AN_KIND = {op:'จุดทำงาน DC', dc:'กวาด DC / พารามิเตอร์ / อุณหภูมิ', ac:'ตอบสนองความถี่ AC (Bode)', tran:'ชั่วคราว (ตามเวลา)', four:'ฟูเรียร์ / THD'};
+// กรองโพรบตามชนิด: '' ทั้งหมด · V แรงดัน · I กระแส · P กำลัง
+const AN_PT = [['', 'ทั้งหมด'], ['V', 'แรงดัน V'], ['I', 'กระแส I'], ['P', 'กำลัง P']];
+function anPtOk(id, q){ return (!AN.pt || id.startsWith(AN.pt + '(')) && (!q || id.toLowerCase().includes(q)); }
+function anPtApply(el){ const q = (AN.filter || '').toLowerCase(); el.querySelectorAll('.anlist label').forEach(l => { l.style.display = anPtOk(l.textContent.trim(), q) ? '' : 'none'; }); }
 const AN_COL = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#db2777', '#65a30d'];
 function anDefaults(){
   const net = spBuild(), pr = spProbes(net), sig = S.comps.map(c => c.t + ':' + c.n).join(',');
@@ -8313,7 +8323,9 @@ function anDefaults(){
   if (!AN.probes || !AN.probes.some(id => pr.some(p => p.id === id))){
     const pick = [];
     for (const c of S.comps) if (c.t === 'scope'){ pick.push('V(' + c.n + '.CH1−⏚)'); if (c.on2 !== false) pick.push('V(' + c.n + '.CH2−⏚)'); }
-    if (!pick.length) for (const c of S.comps) if (['led', 'res', 'cap', 'diode', 'lamp'].includes(c.t) && pick.length < 3) pick.push('V(' + c.n + ')');
+    if (!pick.length){ for (const c of S.comps) if (['led', 'res', 'cap', 'diode', 'lamp'].includes(c.t) && pick.length < 2) pick.push('V(' + c.n + ')');
+      const ld = S.comps.find(c => ['res', 'lamp', 'led', 'diode', 'ind'].includes(c.t)), ip = ld ? 'I(' + ld.n + ')' : (pr.find(p => p.id.startsWith('I(')) || {}).id;
+      if (ip) pick.push(ip); }
     AN.probes = pick.filter(id => pr.some(p => p.id === id)); }
   const srcs = S.comps.filter(c => ['bat', 'acs', 'src1', 'fgen'].includes(c.t));
   if (!S.comps.some(c => c.n === AN.ac.src) && srcs.length) AN.ac.src = (srcs.find(c => c.t !== 'bat') || srcs[0]).n;
@@ -8349,7 +8361,8 @@ function anUI(){
     <button class="btn on" data-aa="run">▶ จำลอง</button><span style="flex:1"></span>
     <button class="btn" data-aa="csv" title="ส่งออกข้อมูลเป็น CSV">CSV</button><button class="btn" data-aa="png" title="บันทึกกราฟเป็นภาพ">PNG</button><button class="btn" data-aa="net" title="netlist สำหรับ ngspice / LTspice">Netlist</button><button class="btn" data-aa="close">✕</button></div>
     <div class="swc">${par}</div>
-    <div class="anbody"><div class="anprobe"><input data-an="filter" placeholder="ค้นหาโพรบ…" value="${esc(AN.filter || '')}"><div class="anlist">${pr.filter(p => !q || p.id.toLowerCase().includes(q)).map(p =>
+    <div class="anbody"><div class="anprobe"><input data-an="filter" placeholder="ค้นหาโพรบ…" value="${esc(AN.filter || '')}">
+      <div class="anpt">${AN_PT.map(([a, b]) => `<button class="btn${(AN.pt || '') === a ? ' on' : ''}" data-aa="pt:${a}">${b}</button>`).join('')}</div><div class="anlist">${pr.filter(p => anPtOk(p.id, q)).map(p =>
       `<label><input type="checkbox" data-pr="${esc(p.id)}" ${AN.probes.includes(p.id) ? 'checked' : ''}>${esc(p.id)}</label>`).join('')}</div>
       <div class="anhint">V(ชื่อ) = แรงดันคร่อม · V(ชื่อ.ขา) = เทียบกราวด์ · I = กระแส · P = กำลัง</div></div>
       <div class="anplot">${k === 'op' ? '<div id="antab"></div>' : '<canvas id="anv"></canvas>'}<div id="anmeas"></div></div></div>
@@ -8472,6 +8485,7 @@ async function anSave(name, data, type){
   const el = $('#anwin');
   el.addEventListener('click', e => { const b = e.target.closest('[data-aa]'); if (!b) return; const a = b.dataset.aa;
     if (a === 'close') el.hidden = true;
+    if (a.startsWith('pt:')){ AN.pt = a.slice(3); el.querySelectorAll('[data-aa^="pt:"]').forEach(x => x.classList.toggle('on', x === b)); anPtApply(el); return; }
     if (a === 'run'){ anRun(); if (phone()){ const pl = el.querySelector('.anplot'); if (pl) pl.scrollIntoView({block:'start', behavior:'smooth'}); } }
     if (a === 'csv'){ const t = anCSV(); if (!t) return; clipWrite(t); anSave('circuit-lab-' + AN.kind + '.csv', '\ufeff' + t, 'text/csv'); }
     if (a === 'png'){ const c2 = $('#anv'); if (c2) anSave('circuit-lab-' + AN.kind + '.png', c2.toDataURL('image/png')); }
@@ -8483,7 +8497,7 @@ async function anSave(name, data, type){
     if (p){ AN.probes = t.checked ? [...new Set([...AN.probes, p])] : AN.probes.filter(x => x !== p); if (AN.res && AN.res.kind !== 'op') anRun(); return; }
     if (!k) return;
     if (k === 'kind'){ AN.kind = t.value; anUI(); return; }
-    if (k === 'filter'){ AN.filter = t.value; const q = t.value.toLowerCase(); el.querySelectorAll('.anlist label').forEach(l => { l.style.display = l.textContent.toLowerCase().includes(q) ? '' : 'none'; }); return; }
+    if (k === 'filter'){ AN.filter = t.value; anPtApply(el); return; }
     if (k === 'dcp'){ const [cn, pk] = t.value === 'temp' ? ['', 'temp'] : t.value.split('|'); AN.dc.comp = cn; AN.dc.param = pk;
       if (pk === 'temp'){ AN.dc.from = -40; AN.dc.to = 125; } else { const c = S.comps.find(x => x.n === cn), v = c ? c[pk] : 1; AN.dc.from = 0; AN.dc.to = pk === 'pos' ? 100 : +(v*2 || 10).toPrecision(3); }
       anUI(); return; }

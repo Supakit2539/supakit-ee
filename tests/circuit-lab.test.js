@@ -626,6 +626,11 @@ const path = require('path');
           const bs = [...el.querySelectorAll('.swh>button,.swh>select')].filter(b => b.offsetParent && b !== x);
           const r = [el.querySelector('.swh').offsetHeight >= 50, bs.every(b => { const q = b.getBoundingClientRect(); return q.left >= 0 && q.right <= W + 1 && !(xr && q.right > xr.left && q.top < xr.bottom && q.bottom > xr.top); })]; el.hidden = true; return r; }, [btn, w]); }
       checks.push(['มือถือ: หัวหน้าต่างวิเคราะห์/สโคป/เทรนด์/ทดลองชุด ตัดบรรทัดได้ ปุ่ม ▶ จำลอง ฯลฯ อยู่ในจอไม่ถูก ✕ บัง', Object.values(hw).every(v => v && v.every(Boolean)), JSON.stringify(hw)]); }
+      const am = await mp.evaluate(() => { const xs = [], y = []; for (let k = 0; k <= 1000; k++){ xs.push(k*1e-4); y.push(325*Math.sin(2*Math.PI*50*k*1e-4)); } const m = spMeas(xs, y);
+        __sim.load(__sim.EX.pfc.f()); AN.sig = null; anOpen(); const ids = [...document.querySelectorAll('#anwin .anlist label')].map(l => l.textContent.trim()); AN.pt = 'I'; anPtApply($('#anwin'));
+        const vis = [...document.querySelectorAll('#anwin .anlist label')].filter(l => l.style.display !== 'none').map(l => l.textContent.trim()); AN.pt = ''; $('#anwin').hidden = true;
+        return {avg:+m.avg.toFixed(2), rms:+m.rms.toFixed(1), defI:AN.probes.some(x => x.startsWith('I(')), vis:vis.length > 0 && vis.every(x => x.startsWith('I(')), all:ids.length > vis.length}; });
+      checks.push(['วิเคราะห์ SPICE: ไซน์ 325 V ครึ่งคาบเกิน → เฉลี่ย 0 V, RMS 230 V (นับเฉพาะคาบเต็ม) · ปุ่มกรองโพรบ "กระแส I" + โพรบกระแสตั้งต้น', Math.abs(am.avg) < 0.5 && Math.abs(am.rms - 229.8) < 0.5 && am.defI && am.vis && am.all, JSON.stringify(am)]);
     await mctx.close(); }
   const ed = await page.evaluate(async () => { const s = __sim, o = {};
     // เลือกหลายชิ้น + คัดลอก/วาง + ย้อนกลับ/ทำซ้ำ + ย้ายทั้งชุด
