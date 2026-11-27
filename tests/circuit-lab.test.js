@@ -308,7 +308,7 @@ const path = require('path');
       const cbSw = lr => { s.load(build((C, W) => { const sc = C('src3', 4, 1, {n:'การไฟฟ้า'}), p = pinsOf(sc), cb = C('capbank', 4, 9, {n:'CB1', kvar:10, lr}), q = pinsOf(cb);
           [0, 1, 2].forEach(k => { const x = p[k][0]; C('mcb', x, 5, {r:1, n:'Q' + (k + 1), In:63, on:false}); W([x, p[k][1]], [x, 4]); W([x, 6], [x, q[k][1]]); }); }));
         s.run(1); INR.fix = 90; ['Q1', 'Q2', 'Q3'].forEach(n => s.find(n).on = true); s.solveNow(); s.run(0.05); const cb = s.find('CB1');
-        sel = {k:'c', c:s.find('การไฟฟ้า')}; LG.on = true; LG.lock = null; lgDraw(); return [Math.round(cb._inr.pk), Math.round(cb._inr.f0), !!LG.evlab]; };
+        sel = {k:'c', c:s.find('การไฟฟ้า')}; LG.on = true; LG.lock = null; LG.win = '2c'; lgDraw(); return [Math.round(cb._inr.pk), Math.round(cb._inr.f0), !!LG.evlab]; };
  o.inr.push([...INR.ev.comps.keys()].map(id => s.S.comps.find(x => x.id === id).n).sort().join(','), Math.round(INR.ev.f0)); o.cbinr = [cbSw(0), cbSw(100)]; INR.fix = null; }
     s.load('arduino'); s.run(1.2); o.pwmSw = scopeSwitchers().map(x => [x.f, Math.round(x.duty*100)/100]);
 
@@ -655,17 +655,19 @@ const path = require('path');
       hw.scroll = await mp.evaluate(() => { const r = [document.scrollingElement.scrollTop === 0, document.querySelector('header').getBoundingClientRect().top === 0, $('#anwin').scrollTop > 50]; $('#anwin').hidden = true; return r; });
       hw.kb = await mp.evaluate(async () => { anOpen(); const inp = $('#anwin input[data-an="filter"]'); inp.focus(); document.scrollingElement.scrollTop = 276; inp.blur();
         await new Promise(r => setTimeout(r, 600)); const r = [scrollY === 0, getComputedStyle($('#insp')).visibility === 'hidden']; $('#anwin').hidden = true; return r; });
-      hw.lg = await mp.evaluate(() => { document.querySelectorAll('#anwin,#scopewin,#trwin,#exwin').forEach(e => e.hidden = true); LG.on = true;
+      hw.lg = await mp.evaluate(() => { document.querySelectorAll('#anwin,#scopewin,#trwin,#exwin').forEach(e => e.hidden = true); LG.on = true; LG.win = '2c';
         __sim.load(__sim.EX.dol.f()); setView('off'); const st = __sim.find('START'); st._pr = true; __sim.poke(); __sim.run(0.3); st._pr = false; __sim.poke(); __sim.run(3);
         sel = {k:'c', c:__sim.find('H1')}; lgDraw(); const a = [!$('#lgraph').hidden, /21\.\d mA/.test($('#lgval').textContent), /PF 1\.00/.test($('#lgval').textContent)];
         sel = {k:'c', c:__sim.find('M1')}; lgDraw(); a.push(/2\.55 A ×3/.test($('#lgval').textContent));
-        __sim.load(__sim.EX.series.f()); sel = {k:'c', c:__sim.find('H1')}; __sim.run(1); lgDraw(); a.push(LG.h.length > 5, /250 mA/.test($('#lgval').textContent));
+        __sim.load(__sim.EX.series.f()); sel = {k:'c', c:__sim.find('H1')}; __sim.run(1); lgDraw(); a.push(LG.ph.length >= 1, /250 mA/.test($('#lgval').textContent));
+        LG.win = '0.04'; __sim.load(__sim.EX.pfc.f()); sel = {k:'c', c:__sim.find('PM1')}; __sim.run(1); INR.fix = 90; __sim.find('S1').on = true; __sim.solveNow(); __sim.run(0.02); lgDraw(); INR.fix = null;
+        a.push(LG.roll && LG.evMark > 0 && LG.evMark < 0.04, $('#lgspd').options.length >= 6); LG.win = '2c';
         sel = null; lgDraw(); a.push($('#lgraph').hidden);
         __sim.load(__sim.EX.dol.f()); setView('off'); sel = {k:'c', c:__sim.find('M1')}; lgDraw(); $('#lglock').click(); const st2 = __sim.find('START'); sel = {k:'c', c:st2};
         st2._pr = true; __sim.poke(); __sim.run(0.3); st2._pr = false; __sim.poke(); __sim.run(3); lgDraw();
         a.push(/M1/.test($('#lgname').textContent), /2\.55 A ×3/.test($('#lgval').textContent)); $('#lglock').click(); lgDraw(); a.push(!LG.lock, /START/.test($('#lgname').textContent) || $('#lgraph').hidden); __sim.load(__sim.EX.pfc.f()); __sim.run(4); const pm = () => { sel = {k:'c', c:__sim.find('PM1')}; lgDraw(); return +($('#lgval').textContent.match(/I ([\d.]+) A/) || [])[1]; };
         const i0 = pm(); __sim.find('S1').on = true; __sim.solveNow(); __sim.run(1); a.push(i0 > 7 && pm() < 5); return a; });
-      checks.push(['มือถือ: หัวหน้าต่างวิเคราะห์/สโคป/เทรนด์/ทดลองชุด ตัดบรรทัดได้ ปุ่ม ▶ จำลอง ฯลฯ อยู่ในจอไม่ถูก ✕ บัง · กดจำลอง/ปิดคีย์บอร์ดแล้วหน้าไม่เลื่อนค้าง แผ่นข้อมูลที่ปิดไม่โผล่ · กราฟสด: H1 21.8 mA PF 1.00, M1 2.55 A ×3, series DC ประวัติ 250 mA, ไม่เลือก = ซ่อน, 📌 ล็อก M1 แล้วกด START กราฟยังเป็น M1 · PM1 7.16 → 4.78 A เมื่อสับ C1', Object.values(hw).every(v => v && v.every(Boolean)), JSON.stringify(hw)]); }
+      checks.push(['มือถือ: หัวหน้าต่างวิเคราะห์/สโคป/เทรนด์/ทดลองชุด ตัดบรรทัดได้ ปุ่ม ▶ จำลอง ฯลฯ อยู่ในจอไม่ถูก ✕ บัง · กดจำลอง/ปิดคีย์บอร์ดแล้วหน้าไม่เลื่อนค้าง แผ่นข้อมูลที่ปิดไม่โผล่ · กราฟสด: H1 21.8 mA PF 1.00, M1 2.55 A ×3, series DC ประวัติ 250 mA, ไม่เลือก = ซ่อน, 📌 ล็อก M1 แล้วกด START กราฟยังเป็น M1 · แบบไหล 40 ms เห็นจุดสับ C1 ในหน้าต่าง, ความเร็ว ×0.01–×20 · PM1 7.16 → 4.78 A เมื่อสับ C1', Object.values(hw).every(v => v && v.every(Boolean)), JSON.stringify(hw)]); }
       const am = await mp.evaluate(() => { const xs = [], y = []; for (let k = 0; k <= 1000; k++){ xs.push(k*1e-4); y.push(325*Math.sin(2*Math.PI*50*k*1e-4)); } const m = spMeas(xs, y);
         __sim.load(__sim.EX.pfc.f()); AN.sig = null; anOpen(); const ids = [...document.querySelectorAll('#anwin .anlist label')].map(l => l.textContent.trim()); AN.pt = 'I'; anPtApply($('#anwin'));
         const vis = [...document.querySelectorAll('#anwin .anlist label')].filter(l => l.style.display !== 'none').map(l => l.textContent.trim()); AN.pt = ''; $('#anwin').hidden = true;

@@ -86,6 +86,8 @@ input:focus,select:focus,textarea:focus,.btn:focus-visible{outline:2px solid var
 #lgval{flex:1;min-width:0;font:11.5px 'IBM Plex Mono',monospace;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #lgraph .lgh .btn{padding:0 8px;min-height:26px;min-width:30px}
 #lgcv{width:100%;height:170px;display:block}
+#lgraph .lgt{display:flex;gap:10px;padding:2px 10px 0;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
+#lgraph .lgt select{font-size:11.5px;padding:1px 4px;min-height:0}
 #cv{flex:1 1 0;display:block;min-width:0;min-height:0;height:100%;touch-action:none;background:var(--board);cursor:default}
 #fwrap{display:none;position:relative;flex:1 1 0;min-width:0;min-height:0;border-left:1px solid var(--line);overflow:hidden;background:linear-gradient(var(--sky1),var(--sky2) 62%)}
 #views.split #fwrap,#views.full #fwrap{display:block}
@@ -374,7 +376,7 @@ button,select,.pi,summary{touch-action:manipulation}
   <button class="btn" id="bExp" title="ทดลองแบบชุด: กวาดค่าพารามิเตอร์ วัด overshoot / settling / IAE / พลังงาน">ทดลองชุด</button>
   <button class="btn" id="bAn" title="วิเคราะห์วงจรแบบ SPICE: จุดทำงาน, กวาด DC, AC (Bode), ชั่วคราว, ฟูเรียร์">วิเคราะห์</button>
   <button class="btn run" id="bRun" title="รัน/หยุดการจำลอง (Space)"></button>
-  <select id="spd" title="ความเร็วจำลอง"><option value="1" selected>×1</option><option value="5">×5</option><option value="20">×20</option></select>
+  <select id="spd" title="ความเร็วจำลอง (ช้าลงเพื่อดูคลื่น 50 Hz ไหลในกราฟสด)"><option value="0.01">×0.01</option><option value="0.05">×0.05</option><option value="0.2">×0.2</option><option value="1" selected>×1</option><option value="5">×5</option><option value="20">×20</option></select>
   <button class="btn" id="bVal" title="แสดงค่า/แรงดัน/กระแสที่สัญลักษณ์อุปกรณ์">ค่า ▾</button>
   <button class="btn" id="bTheme" title="สลับธีม">ธีม</button>
   <button class="btn cmp" id="bInst" title="ติดตั้งแอปลงเครื่อง (ใช้ออฟไลน์ได้)" hidden>📲 ติดตั้งแอป</button>
@@ -403,7 +405,7 @@ button,select,.pi,summary{touch-action:manipulation}
 <div id="main">
   <nav id="pal"></nav>
   <div id="center">
-    <div id="views" class="off"><canvas id="cv"></canvas><div id="lgraph" hidden><div class="lgh"><b id="lgname"></b><span id="lgval"></span><button class="btn" id="lglock" title="ล็อกกราฟไว้ที่อุปกรณ์นี้ (แตะอุปกรณ์อื่น เช่น กดสวิตช์ กราฟไม่เปลี่ยน)">📌</button><button class="btn" id="lgx" title="ซ่อนกราฟสด (เปิดใหม่ได้จากปุ่ม กราฟสด)">✕</button></div><canvas id="lgcv"></canvas></div><div id="fwrap"><canvas id="fx"></canvas><div id="fzoom"><button class="btn" data-z="in" title="ซูมเข้า">+</button><button class="btn" data-z="out" title="ซูมออก">−</button><button class="btn" data-z="fit" title="เล็งกล้องกลางฉาก">⤢</button></div><div id="flab"></div><div id="fhud"></div></div></div>
+    <div id="views" class="off"><canvas id="cv"></canvas><div id="lgraph" hidden><div class="lgh"><b id="lgname"></b><span id="lgval"></span><button class="btn" id="lglock" title="ล็อกกราฟไว้ที่อุปกรณ์นี้ (แตะอุปกรณ์อื่น เช่น กดสวิตช์ กราฟไม่เปลี่ยน)">📌</button><button class="btn" id="lgx" title="ซ่อนกราฟสด (เปิดใหม่ได้จากปุ่ม กราฟสด)">✕</button></div><div class="lgt"><label>ช่วงเวลา <select id="lgwin"><option value="2c">2 คาบ (ภาพนิ่ง)</option><option value="0.04">40 ms (ไหล)</option><option value="0.1">0.1 s (ไหล)</option><option value="0.5">0.5 s (ไหล)</option><option value="2">2 s (ไหล)</option><option value="10">10 s (ไหล)</option></select></label><label>ความเร็ว <select id="lgspd"></select></label></div><canvas id="lgcv"></canvas></div><div id="fwrap"><canvas id="fx"></canvas><div id="fzoom"><button class="btn" data-z="in" title="ซูมเข้า">+</button><button class="btn" data-z="out" title="ซูมออก">−</button><button class="btn" data-z="fit" title="เล็งกล้องกลางฉาก">⤢</button></div><div id="flab"></div><div id="fhud"></div></div></div>
     <div id="hint"></div>
     <section id="lad"></section>
     <div id="scopewin" hidden></div>
@@ -3163,7 +3165,7 @@ function settle(){
     needSolve = false; solveAll(); discrete(0);
   }
 }
-function step(dt){ simT += dt; continuous(dt); facStep(dt); discrete(dt); settle(); capInrush(); if (trApplicable()) trRun(dt); else TR.active = false; scopeRecord(); trendRec(); lgRec(); }
+function step(dt){ simT += dt; continuous(dt); facStep(dt); discrete(dt); settle(); capInrush(dt); if (trApplicable()) trRun(dt); else TR.active = false; scopeRecord(); trendRec(); lgRec(); }
 function poke(){ needSolve = true; settle(); }
 
 /* ============================================================
@@ -8655,14 +8657,18 @@ function trendSigs(){ return trendCfg().sig.map(x => String(x || '').trim()); }
    วงจร RLC อนุกรม: vc(0) = 0, i(0) = 0 → vc = vss + e^(−αt)(A cos ωd t + B sin ωd t) · ยอด ≈ v0/√(L/C) · ใช้กับไฟ AC แบบเฟเซอร์เท่านั้น (โหมดตามเวลาจำลองเองอยู่แล้ว)
    อุปกรณ์ที่กระแสตัวเก็บประจุไหลผ่าน (สวิตช์อนุกรม, มิเตอร์, แหล่งจ่าย) ได้รูปคลื่นกระชากเดียวกันในกราฟสด */
 const INR = {Ls:20e-6, R:0.1, ev:null};
-function capInrush(){
+// เวลา/มุมขณะสับ: สุ่มภายใน step ล่าสุด (ไม่เกิน 1 คาบ) · INR.fix = องศาคงที่ (ทดสอบ) → เวลาสับ = ครั้งล่าสุดที่มุมนั้นผ่านมา · คืน [มุม, เวลาจำลอง]
+function inrT(w, dt){ const P = 2*Math.PI/w, span = Math.min(P, dt > 0 ? dt : P);
+  if (INR.fix != null){ const th = INR.fix*Math.PI/180, back = (((w*simT - th) % (2*Math.PI)) + 2*Math.PI) % (2*Math.PI)/w; return [th, simT - back]; }
+  const tEv = simT - Math.random()*span; return [((w*tEv) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI), tEv]; }
+function capInrush(dt){
   if (RES.trans) return; const f = RES.f || 50, w = 2*Math.PI*f;
   const Vsrc = []; for (const o of S.comps){ if (o.t === 'src1' || o.t === 'acs') Vsrc.push(o.V); if (o.t === 'src3') Vsrc.push(o.V, o.V/SQ3); }
   for (const c of S.comps){ if (c.t !== 'cap') continue; const R = RES.comp[c.id]; if (!R || !R.v) continue;
     const mag = Math.hypot(R.v.r || 0, R.v.i || 0), was = c._vmag; c._vmag = mag;
     if (was === undefined || was > 1 || mag < 5 || c._blown || !Vsrc.some(v => Math.abs(mag - v) < 0.1*v)) continue;     // ต้องคร่อมไฟหลักโดยตรง
     const C = (c.C || 0)*1e-6, L = INR.Ls + (+c.lr || 0)*1e-6, Rr = INR.R; if (!(C > 0)) continue;
-    const al = Rr/(2*L), w0 = 1/Math.sqrt(L*C), wd = Math.sqrt(Math.max(1, w0*w0 - al*al)), th = INR.fix != null ? INR.fix*Math.PI/180 : Math.random()*2*Math.PI;   // มุมขณะสับ: สุ่มเหมือนจริง (INR.fix = องศาคงที่ สำหรับทดสอบ)
+    const al = Rr/(2*L), w0 = 1/Math.sqrt(L*C), wd = Math.sqrt(Math.max(1, w0*w0 - al*al)), [th, tEv] = inrT(w, dt);
     const vss0 = lgAt(R.v, w, th/w), iss0 = lgAt(R.i, w, th/w), A = -vss0, B = (-iss0/C + al*A)/wd;
     const itr = t => t < 0 ? 0 : C*Math.exp(-al*t)*((-al*A + wd*B)*Math.cos(wd*t) + (-al*B - wd*A)*Math.sin(wd*t));
     const vtr = t => t < 0 ? 0 : Math.exp(-al*t)*(A*Math.cos(wd*t) + B*Math.sin(wd*t));
@@ -8674,27 +8680,27 @@ function capInrush(){
       if (sim(ix, Ic)) comps.set(o.id, {s:1, ser:true}); else if (sim(ix, lgNeg(Ic))) comps.set(o.id, {s:-1, ser:true});
       else if (['src1', 'acs', 'pmeter', 'rcd'].includes(o.t)){ const d1 = Math.hypot(ix.r - Ic.r, ix.i - Ic.i), d2 = Math.hypot(ix.r + Ic.r, ix.i + Ic.i); comps.set(o.id, {s:d1 < d2 ? 1 : -1, ser:false}); } }
     c._inr = {pk, t:simT, v0:vss0, f0:wd/(2*Math.PI), x:+(pk/Math.max(1e-9, Math.SQRT2*Math.hypot(Ic.r, Ic.i))).toFixed(0)};
-    INR.ev = {c, th, w, tr:[itr], vtr:[vtr], Ic:[Ic], comps, wall:performance.now(), pk, f0:wd/(2*Math.PI)};
+    INR.ev = {c, th, w, tr:[itr], vtr:[vtr], Ic:[Ic], comps, wall:performance.now(), pk, f0:wd/(2*Math.PI), tSim:simT, tEv};
   }
   // คาปาซิเตอร์แบงก์ 3 เฟส (เดลต้า): คอนแทกเตอร์ 3 ขั้วสับพร้อมกัน → แต่ละขา (Lk–Lk+1) เป็น LC กับความเหนี่ยวนำ 2 สาย · กระแสสาย = ขา k − ขา k−1
   for (const c of S.comps){ if (c.t !== 'capbank') continue; const R = RES.comp[c.id]; if (!R || !R.vLL) continue;
     const mag = Math.hypot(R.vLL[0].r || 0, R.vLL[0].i || 0), was = c._vmag; c._vmag = mag;
     if (was === undefined || was > 1 || mag < 20 || Math.abs(mag - c.V) > 0.15*c.V) continue;
     const C = R.Cp, L = 2*(INR.Ls + (+c.lr || 0)*1e-6), Rr = 2*INR.R, al = Rr/(2*L), w0 = 1/Math.sqrt(L*C), wd = Math.sqrt(Math.max(1, w0*w0 - al*al));
-    const th = INR.fix != null ? INR.fix*Math.PI/180 : Math.random()*2*Math.PI;
+    const [th, tEv] = inrT(w, dt);
     const leg = [0, 1, 2].map(k => { const vss0 = lgAt(R.vLL[k], w, th/w), iss0 = lgAt(R.iLeg[k], w, th/w), A = -vss0, B = (-iss0/C + al*A)/wd;
       return t => t < 0 ? 0 : C*Math.exp(-al*t)*((-al*A + wd*B)*Math.cos(wd*t) + (-al*B - wd*A)*Math.sin(wd*t)); });
     const tr = [0, 1, 2].map(k => (t => leg[k](t) - leg[(k + 2)%3](t)));
     let pk = 0; for (let n = 0; n <= 600; n++){ const t = n/600*Math.min(5e-3, 6/al); for (let k = 0; k < 3; k++){ const v = Math.abs(lgAt(R.iL[k], w, th/w + t) + tr[k](t)); if (v > pk) pk = v; } }
     const comps = new Map([[c.id, {s:1, ser:true}]]); for (const o of S.comps) if (o.t === 'src3') comps.set(o.id, {s:1, ser:false});
     c._inr = {pk, t:simT, f0:wd/(2*Math.PI), x:+(pk/Math.max(1e-9, Math.SQRT2*R.I)).toFixed(0)};
-    INR.ev = {c, th, w, tr, vtr:null, Ic:R.iL, comps, wall:performance.now(), pk, f0:wd/(2*Math.PI)};
+    INR.ev = {c, th, w, tr, vtr:null, Ic:R.iL, comps, wall:performance.now(), pk, f0:wd/(2*Math.PI), tSim:simT, tEv};
   }
 }
 /* ---------- กราฟสด (#lgraph): แรงดัน กระแส กำลัง ของอุปกรณ์ที่เลือก ซ้อนในกราฟเดียว ----------
-   AC: 2 คาบ ทริกที่จุดตัดศูนย์ขาขึ้นของแรงดัน (เฟเซอร์ หรือบัฟเฟอร์โหมดตามเวลา) · DC: ประวัติ 10 s ล่าสุด (LG.h บันทึกทุก step)
+   AC: 2 คาบ ทริกที่จุดตัดศูนย์ขาขึ้นของแรงดัน (เฟเซอร์ หรือบัฟเฟอร์โหมดตามเวลา) · แบบไหล (LG.win): เฟเซอร์ที่บันทึกใน LG.ph ทุก step → รูปคลื่นตามเวลาจริง (DC/2 คาบ = 10 s)
    อุปกรณ์ 3 เฟส (src3, motor3/6): แรงดันเฟส U + กระแส U V W + กำลังรวมขณะหนึ่ง */
-const LG = {lock:null, on:(() => { try { return localStorage.getItem('circuit-lab-lg') !== '0'; } catch (e) { return true; } })(), id:null, h:[]};
+const LG = {win:(() => { try { return localStorage.getItem('circuit-lab-lgwin') || '0.1'; } catch (e) { return '0.1'; } })(), ph:[], lock:null, on:(() => { try { return localStorage.getItem('circuit-lab-lg') !== '0'; } catch (e) { return true; } })(), id:null, h:[]};
 const LG_COL = {V:'#2563eb', I:['#dc2626', '#d97706', '#7c3aed'], P:'#16a34a'};
 const lgNeg = p => ({d:-(p.d || 0), r:-(p.r || 0), i:-(p.i || 0)});
 // คู่ [แรงดัน, กระแส] (เฟเซอร์ {d, r, i} ค่า RMS) ของอุปกรณ์ · null = ไม่มีข้อมูล
@@ -8709,23 +8715,29 @@ function lgPairs(c){ const R = RES.comp[c.id]; if (!R) return null;
 const lgAt = (p, w, t) => (p.d || 0) + Math.SQRT2*Math.hypot(p.r || 0, p.i || 0)*Math.sin(w*t + Math.atan2(p.i || 0, p.r || 0));
 // อุปกรณ์ที่กราฟแสดง: ที่ล็อกไว้ (📌) ก่อน ไม่งั้นตัวที่เลือก
 function lgTarget(){ if (LG.lock){ const c = S.comps.find(o => o.id === LG.lock && o.n === LG.lockN); if (c) return c; LG.lock = null; } return sel && sel.k === 'c' ? sel.c : null; }
+// บันทึกเฟเซอร์ของอุปกรณ์ที่ดูทุก step (เฉพาะเมื่อเปลี่ยน) → กราฟแบบไหลสร้างรูปคลื่นจริงตามเวลาจำลอง · ตอนสับตัวเก็บประจุ ใช้เวลาสับจริง (INR.ev.tEv)
 function lgRec(){ if (!LG.on) return; const c = lgTarget(); if (!c) return;
-  if (LG.id !== c.id){ LG.id = c.id; LG.h = []; }
-  const pr = lgPairs(c); if (!pr) return; const [v, i] = pr[0];
-  LG.h.push([simT, v.d || 0, i.d || 0, pr.reduce((a, [vv, ii]) => a + (vv.d || 0)*(ii.d || 0) + (vv.r*ii.r + vv.i*ii.i || 0), 0)]);
-  while (LG.h.length > 2 && LG.h[0][0] < simT - 10) LG.h.shift(); }
+  if (LG.id !== c.id){ LG.id = c.id; LG.ph = []; }
+  const pr = lgPairs(c); if (!pr) return;
+  const cl = pr.map(([v, i]) => [{d:v.d || 0, r:v.r || 0, i:v.i || 0}, {d:i.d || 0, r:i.r || 0, i:i.i || 0}]), E = INR.ev;
+  const t = E && E.tSim === simT && E.comps.has(c.id) ? E.tEv : simT, last = LG.ph[LG.ph.length - 1];
+  const same = last && last.pr.length === cl.length && last.pr.every((pq, k) => pq.every((p, j) => { const q = cl[k][j], m = Math.max(1e-9, Math.hypot(q.d, q.r, q.i)); return Math.abs(p.d - q.d) + Math.abs(p.r - q.r) + Math.abs(p.i - q.i) < 1e-4*m; }));
+  if (!same) LG.ph.push({t, pr:cl});
+  while (LG.ph.length > 2 && LG.ph[1].t < simT - 12) LG.ph.shift(); if (LG.ph.length > 6000) LG.ph.splice(0, LG.ph.length - 6000); }
 function lgDraw(){
   const el = $('#lgraph'), c = lgTarget(), pr = c && LG.on ? lgPairs(c) : null;
   $('#lglock').classList.toggle('on', !!LG.lock);
   $('#bLive').classList.toggle('on', LG.on);
   if (!pr || $('#views').classList.contains('full')){ el.hidden = true; return; }
-  el.hidden = false; if (LG.id !== c.id){ LG.id = c.id; LG.h = []; }
+  el.hidden = false; if (LG.id !== c.id){ LG.id = c.id; LG.ph = []; lgRec(); }
   const R = RES.comp[c.id], f = RES.f || 50, w = 2*Math.PI*f, three = pr.length === 3;
   const ac = pr.some(([v, i]) => Math.hypot(v.r || 0, v.i || 0) > 1e-3 || Math.hypot(i.r || 0, i.i || 0) > 1e-6);
   // สัญญาณตามเวลา
   let Tw, xs = [], tr = [];
-  const N = 240, ev = INR.ev && performance.now() - INR.ev.wall < 6000 && INR.ev.comps.get(c.id);
-  if (ac && ev && pr.length === INR.ev.tr.length){
+  const N = 240, ev = INR.ev && performance.now() - INR.ev.wall < 6000 && INR.ev.comps.get(c.id), roll = LG.win !== '2c' || !ac;
+  $('#lgwin').value = LG.win;
+  LG.roll = false; LG.evMark = null;
+  if (!roll && ev && pr.length === INR.ev.tr.length){
     // จับภาพตอนสับ: −2 ms ถึง +8 ms รอบจุดสับ (ละเอียดพอเห็นการสั่นความถี่สูง) · 1 เฟส หรือ 3 เฟส (กระแสสาย L1 L2 L3)
     const E = INR.ev, M = 1200; Tw = 0.01; const tb = -0.002, isC = c === E.c;
     for (let n = 0; n <= M; n++) xs.push(n/M*Tw);
@@ -8736,7 +8748,7 @@ function lgDraw(){
     tr = [{u:'V', nm:three ? 'V (L1)' : 'V', col:LG_COL.V, y:Vs[0]}, ...Is.map((I, k) => ({u:'A', nm:three ? 'I L' + (k + 1) : 'I', col:LG_COL.I[k], y:I})),
       {u:'W', nm:three ? 'P รวม' : 'P', col:LG_COL.P, y:xs.map((x, n) => Vs.reduce((a, V, k) => a + V[n]*Is[k][n], 0))}];
     LG.evlab = `⚡ สับ ${E.c.n} ที่มุม ${Math.round(E.th*180/Math.PI)}° · กระชากยอด ${fmt(E.pk, 'A')} · สั่น ${fmt(E.f0, 'Hz')}`; LG.ev0 = -tb; }
-  else if (ac){ LG.evlab = null; Tw = 2/f; const v0 = pr[0][0], t0 = -Math.atan2(v0.i || 0, v0.r || 0)/w;                               // ทริก: แรงดันตัดศูนย์ขาขึ้น
+  else if (!roll){ LG.evlab = null; Tw = 2/f; const v0 = pr[0][0], t0 = -Math.atan2(v0.i || 0, v0.r || 0)/w;                               // ทริก: แรงดันตัดศูนย์ขาขึ้น
     const trv = RES.trans && TR.tw && isTwo(c) && c._n ? (() => { const fi = trCurAt(c, simT); if (fi == null) return null; const tE = TR.tw.tEnd;
       return {v:t => trNodeAt(c._n[0], t) - trNodeAt(c._n[1], t), i:t => trCurAt(c, t), t0:tE - Tw}; })() : null;
     for (let n = 0; n <= N; n++) xs.push(n/N*Tw);
@@ -8744,11 +8756,35 @@ function lgDraw(){
     else { tr.push({u:'V', nm:three ? 'V (U)' : 'V', col:LG_COL.V, y:xs.map(t => lgAt(pr[0][0], w, t + t0))});
       pr.forEach(([, i], k) => tr.push({u:'A', nm:three ? 'I ' + 'UVW'[k] : 'I', col:LG_COL.I[k], y:xs.map(t => lgAt(i, w, t + t0))}));
       tr.push({u:'W', nm:three ? 'P รวม' : 'P', col:LG_COL.P, y:xs.map(t => pr.reduce((a, [v, i]) => a + lgAt(v, w, t + t0)*lgAt(i, w, t + t0), 0))}); } }
-  else { LG.evlab = null; const h = LG.h; Tw = 10; const tE = h.length ? h[h.length - 1][0] : simT; xs = h.map(e => e[0] - (tE - Tw));
-    tr = [{u:'V', nm:'V', col:LG_COL.V, y:h.map(e => e[1])}, {u:'A', nm:'I', col:LG_COL.I[0], y:h.map(e => e[2])}, {u:'W', nm:'P', col:LG_COL.P, y:h.map(e => e[3])}]; }
+  else {
+    // แบบไหล: หน้าต่างเวลา Tw ล่าสุดถึง "ตอนนี้" · สร้างรูปคลื่นจากเฟเซอร์ที่บันทึกไว้ ณ แต่ละเวลา (+ กระแสกระชากตอนสับ) หรือบัฟเฟอร์โหมดตามเวลา
+    // แต่ละคอลัมน์ของจอเก็บต่ำสุด/สูงสุด: คอลัมน์ยาวกว่า 1/10 คาบ = แถบขอบเขตไซน์ (คำนวณตรงจากเฟเซอร์), สั้นกว่า = เส้นคลื่นจริง
+    LG.evlab = null; Tw = LG.win === '2c' ? 10 : +LG.win; const tA = simT - Tw, per = 1/f, PH = LG.ph;
+    const NC = Math.max(60, Math.min(520, ($('#lgcv').clientWidth || 400) - 112)), cd = Tw/NC, np = pr.length;
+    const at = t => { let lo = 0, hi = PH.length - 1; if (hi < 0 || PH[0].t > t) return null; while (lo < hi){ const m = (lo + hi + 1) >> 1; if (PH[m].t <= t) lo = m; else hi = m - 1; } return PH[lo].pr; };
+    const E = INR.ev && INR.ev.comps.get(c.id) && INR.ev.tr.length === np && INR.ev.tEv > tA - 0.05 ? INR.ev : null, es = E && E.comps.get(c.id);
+    const trv = RES.trans && TR.tw && isTwo(c) && c._n && Tw <= 0.9 && trCurAt(c, simT) != null ? {v:t => trNodeAt(c._n[0], t) - trNodeAt(c._n[1], t), i:t => trCurAt(c, t)} : null;
+    const inst = t => { if (trv){ const v = trv.v(t), i = trv.i(t); return [[v], [i]]; }
+      const p = at(t); if (!p) return null; const de = E && t >= E.tEv && t - E.tEv < 0.05 ? t - E.tEv : null;
+      return [p.map(([v], k) => lgAt(v, w, t) + (de != null && c === E.c && E.vtr ? E.vtr[k](de) : 0)), p.map(([, i], k) => lgAt(i, w, t) + (de != null ? es.s*E.tr[k](de) : 0))]; };
+    const mk = () => ({lo:new Float32Array(NC).fill(NaN), hi:new Float32Array(NC).fill(NaN)}), bV = mk(), bI = pr.map(mk), bP = mk();
+    const put = (b, n, a, z) => { if (!(b.lo[n] <= a)) b.lo[n] = a; if (!(b.hi[n] >= z)) b.hi[n] = z; };
+    const amp = p => Math.SQRT2*Math.hypot(p.r, p.i);
+    for (let n = 0; n < NC; n++){ const t0 = tA + n*cd, tc = t0 + cd/2; xs.push(tc - tA);
+      const nearEv = E && E.tEv < t0 + cd + 1e-9 && E.tEv + 0.02 > t0;
+      if (cd >= per/10 && !nearEv && !trv){ const p = at(tc); if (!p) continue;                        // แถบขอบเขตจากเฟเซอร์
+        put(bV, n, p[0][0].d - amp(p[0][0]), p[0][0].d + amp(p[0][0])); p.forEach(([, i], k) => put(bI[k], n, i.d - amp(i), i.d + amp(i)));
+        let Pa = 0, cr = 0, ci = 0; for (const [v, i] of p){ Pa += v.d*i.d + v.r*i.r + v.i*i.i; cr += v.r*i.r - v.i*i.i; ci += v.r*i.i + v.i*i.r; } const A2 = Math.hypot(cr, ci); put(bP, n, Pa - A2, Pa + A2); }
+      else { const S = nearEv ? 40 : cd >= per/8 ? 12 : 3;
+        for (let q = 0; q <= S; q++){ const t = t0 + q/S*cd, r = inst(t); if (!r) continue; const [V, I] = r;
+          put(bV, n, V[0], V[0]); I.forEach((x, k) => put(bI[k], n, x, x)); const pp = V.reduce((a, v, k) => a + v*I[k], 0); put(bP, n, pp, pp); } } }
+    const nm3 = three ? (c.t === 'capbank' || c.t === 'src3' ? 'L' : '') : '';
+    tr = [{u:'V', nm:three ? 'V (' + (nm3 ? 'L1' : 'U') + ')' : 'V', col:LG_COL.V, ...bV}, ...bI.map((b, k) => ({u:'A', nm:three ? 'I ' + (nm3 ? 'L' + (k + 1) : 'UVW'[k]) : 'I', col:LG_COL.I[k], ...b})),
+      {u:'W', nm:three ? 'P รวม' : 'P', col:LG_COL.P, ...bP}];
+    LG.roll = true; LG.evMark = E ? E.tEv - tA : null; }
   // ค่าอ่าน
   const P = R.P != null ? (scIsrc(c) || c.t === 'src3' ? -R.P : R.P) : ac ? pr.reduce((a, [v, i]) => a + (v.d || 0)*(i.d || 0) + (v.r || 0)*(i.r || 0) + (v.i || 0)*(i.i || 0), 0)
-    : tr[tr.length - 1].y.reduce((a, b) => a + b, 0)/Math.max(1, tr[tr.length - 1].y.length);
+    : pr.reduce((a, [v, i]) => a + (v.d || 0)*(i.d || 0), 0);
   const rmsP = p => Math.sqrt((p.d || 0)**2 + (p.r || 0)**2 + (p.i || 0)**2);
   const Vr = rmsP(pr[0][0]), Ir = pr.map(([, i]) => rmsP(i)), S2 = pr.reduce((a, [v, i]) => a + rmsP(v)*rmsP(i), 0), pf = ac && S2 > 1e-9 ? Math.abs(P)/S2 : null;
   $('#lgname').textContent = (LG.lock ? '📌 ' : '') + (c.n || T[c.t].nm) + ' ';
@@ -8757,7 +8793,7 @@ function lgDraw(){
   const cv2 = $('#lgcv'), dpr = window.devicePixelRatio || 1, W = cv2.clientWidth, H = cv2.clientHeight; if (!W || !H) return;
   cv2.width = W*dpr; cv2.height = H*dpr; const g = cv2.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
   const L = 54, Rr = 58, top = 12, bot = 18, D = 8, units = ['V', 'A', 'W'];
-  const sc = anOvScale(units.map(u => { let a = Infinity, b = -Infinity; for (const t of tr) if (t.u === u) for (const v of t.y) if (isFinite(v)){ a = Math.min(a, v); b = Math.max(b, v); } return [a, b]; }), D);
+  const sc = anOvScale(units.map(u => { let a = Infinity, b = -Infinity; for (const t of tr) if (t.u === u) for (const arr of t.y ? [t.y] : [t.lo, t.hi]) for (const v of arr) if (isFinite(v)){ a = Math.min(a, v); b = Math.max(b, v); } return [a, b]; }), D);
   const yd = d => H - bot - d/D*(H - top - bot), xm = x => L + x/Tw*(W - L - Rr);
   g.font = "10px 'IBM Plex Mono',monospace"; g.textBaseline = 'middle'; g.lineWidth = 1;
   for (let d = 0; d <= D; d += 2){ const y = yd(d); g.strokeStyle = K.line; g.globalAlpha = d === sc.k ? 1 : 0.55; g.beginPath(); g.moveTo(L, y); g.lineTo(W - Rr, y); g.stroke(); g.globalAlpha = 1;
@@ -8770,8 +8806,16 @@ function lgDraw(){
     g.font = "10px 'IBM Plex Mono',monospace"; g.textBaseline = 'middle'; }
   g.fillStyle = K.muted; g.textAlign = 'center'; g.textBaseline = 'top';
   if (LG.evlab) for (let q = 0; q <= 5; q++){ const tq = q*0.002; g.textAlign = q === 5 ? 'right' : q === 0 ? 'left' : 'center'; g.fillText(fmtAx(tq - LG.ev0, 's').replace('0s', '0'), q === 5 ? W - Rr : q === 0 ? L : xm(tq), H - bot + 3); }
-  else for (let q = 0; q <= 4; q++){ g.textAlign = q === 4 ? 'right' : q === 0 ? 'left' : 'center'; g.fillText(ac ? (LG.evlab ? fmtAx(q/4*Tw - LG.ev0, 's') : fmtAx(q/4*Tw, 's')) : (q === 4 ? 'ตอนนี้' : '−' + fmtAx((1 - q/4)*Tw, 's')), q === 4 ? W - Rr : q === 0 ? L : xm(q/4*Tw), H - bot + 3); }
-  for (const t of [...tr].sort((a, b) => (b.u === 'W') - (a.u === 'W'))){ const j = units.indexOf(t.u); g.strokeStyle = t.col; g.lineWidth = t.u === 'W' ? 1.4 : 1.8; g.setLineDash(t.u === 'W' ? [5, 3] : []); g.beginPath(); let pen = false;
+  else for (let q = 0; q <= 4; q++){ g.textAlign = q === 4 ? 'right' : q === 0 ? 'left' : 'center'; g.fillText(!LG.roll ? fmtAx(q/4*Tw, 's') : (q === 4 ? 'ตอนนี้' : '−' + fmtAx((1 - q/4)*Tw, 's')), q === 4 ? W - Rr : q === 0 ? L : xm(q/4*Tw), H - bot + 3); }
+  if (LG.roll && LG.evMark != null && LG.evMark >= 0){ const X = xm(LG.evMark); g.save(); g.setLineDash([3, 3]); g.strokeStyle = '#f59e0b'; g.beginPath(); g.moveTo(X, yd(D)); g.lineTo(X, yd(0)); g.stroke(); g.restore();
+    g.fillStyle = '#f59e0b'; g.textAlign = 'left'; g.textBaseline = 'bottom'; g.fillText('สับ', X + 3, yd(0) - 2); }
+  for (const t of [...tr].sort((a, b) => (b.u === 'W') - (a.u === 'W'))) if (t.lo){ const j = units.indexOf(t.u), Y = v => yd(sc.k + v/sc.s[j]);
+    // แถบ: ขอบบน (สูงสุด) ไปขวา แล้วขอบล่าง (ต่ำสุด) กลับซ้าย — ช่วงที่ไม่มีข้อมูลตัดเป็นท่อน
+    let n = 0; g.setLineDash(t.u === 'W' ? [5, 3] : []); g.lineWidth = t.u === 'W' ? 1.2 : 1.5; g.strokeStyle = t.col; g.fillStyle = t.col;
+    while (n < xs.length){ while (n < xs.length && !isFinite(t.hi[n])) n++; const a = n; while (n < xs.length && isFinite(t.hi[n])) n++; if (n <= a) continue;
+      g.beginPath(); for (let m = a; m < n; m++) g.lineTo(xm(xs[m]), Y(t.hi[m])); for (let m = n - 1; m >= a; m--) g.lineTo(xm(xs[m]), Y(t.lo[m])); g.closePath();
+      g.globalAlpha = 0.22; g.fill(); g.globalAlpha = 1; g.stroke(); } }
+  for (const t of [...tr].sort((a, b) => (b.u === 'W') - (a.u === 'W'))){ if (!t.y) continue; const j = units.indexOf(t.u); g.strokeStyle = t.col; g.lineWidth = t.u === 'W' ? 1.4 : 1.8; g.setLineDash(t.u === 'W' ? [5, 3] : []); g.beginPath(); let pen = false;
     t.y.forEach((v, n) => { if (!isFinite(v) || xs[n] < 0){ pen = false; return; } const X = xm(xs[n]), Y = yd(sc.k + v/sc.s[j]); if (pen) g.lineTo(X, Y); else { g.moveTo(X, Y); pen = true; } }); g.stroke(); } g.setLineDash([]);
   // ตำนาน
   g.textBaseline = 'top'; g.textAlign = 'left'; g.font = "600 10.5px 'IBM Plex Sans Thai',sans-serif"; let lx = L + 6;
@@ -8780,6 +8824,10 @@ function lgDraw(){
 $('#bLive').onclick = () => { LG.on = !LG.on; try { localStorage.setItem('circuit-lab-lg', LG.on ? '1' : '0'); } catch (e) {} if (LG.on && !(sel && sel.k === 'c')) toast('แตะอุปกรณ์บนแผงเพื่อดูกราฟแรงดัน กระแส กำลัง'); lgDraw(); };
 $('#lglock').onclick = () => { const c = lgTarget(); LG.lock = LG.lock ? null : c ? c.id : null; LG.lockN = c && c.n;
   toast(LG.lock ? 'ล็อกกราฟไว้ที่ ' + (c.n || '') + ' — แตะอุปกรณ์อื่นได้ กราฟไม่เปลี่ยน (กด 📌 อีกครั้งเพื่อปลด)' : 'ปลดล็อกแล้ว — กราฟตามอุปกรณ์ที่แตะ'); lgDraw(); };
+$('#lgwin').onchange = e => { LG.win = e.target.value; try { localStorage.setItem('circuit-lab-lgwin', LG.win); } catch (er) {} lgDraw(); };
+$('#lgspd').innerHTML = $('#spd').innerHTML; $('#lgspd').value = $('#spd').value;
+$('#lgspd').onchange = e => { $('#spd').value = e.target.value; $('#spd').dispatchEvent(new Event('change')); };
+$('#spd').addEventListener('change', () => { $('#lgspd').value = $('#spd').value; });
 $('#lgx').onclick = () => { LG.on = false; try { localStorage.setItem('circuit-lab-lg', '0'); } catch (e) {} lgDraw(); toast('ซ่อนกราฟสดแล้ว — เปิดใหม่ได้ที่ปุ่ม "กราฟสด"'); };
 function trendRec(){
   if (!S.trend) return; const sg = trendSigs(), key = sg.join('|');
@@ -9676,7 +9724,7 @@ $('#bRun').onclick = () => setRunning(!running);
 function frame(now){
   const sp = running ? +$('#spd').value : 0, dt = Math.min(0.1, Math.max(0, (now - last)/1000)); last = now;
   if (sp > 0){ let t = dt*sp; while (t > 1e-6){ const h = Math.min(0.05, t); step(h); t -= h; } } else settle();
-  draw(now); fxDraw();
+  draw(now); fxDraw(); if (running && LG.on && LG.roll) lgDraw();                                  // กราฟสดแบบไหล: วาดทุกเฟรมให้เลื่อนลื่น
   if (now - lastUI > 200){ lastUI = now; scopeRefresh(); lgDraw(); liveUI(); if (ladOpen) ladMon(); fxHud(); if (scopeWin) scopeLive(); }
   requestAnimationFrame(frame);
 }
