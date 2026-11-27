@@ -292,6 +292,11 @@ const path = require('path');
       o.norm = [cp.trig, cp.ch[1].mx[30], cp.ch[1].mx[90], cp.ch[1].mx[400]];
       s.load('osc'); s.find('T1').V2 = 230; s.find('T1').S = 2000; s.solveNow(); const wa = warnList().some(x => x[1].includes('เกินพิกัดโพรบ ×1'));
       s.find('OSC1').px1 = 10; s.solveNow(); o.prwarn = [wa, warnList().some(x => x[1].includes('เกินพิกัดโพรบ'))]; }
+    // โพรบกระแส: osc CH1 ⊂ RL = กระแส RL (เฟเซอร์), rectifier (ตามเวลา) RL ≈ 144 mA DC, C1 เฉลี่ย ≈ 0 มีพีคชาร์จ, Math CH1×CH2 (V×A) = W
+    { s.load('osc'); s.run(1); let c = s.find('OSC1'); c.cp1 = 'RL'; c.vdiv1 = 0.1; s.solveNow(); let cp = s.scope('OSC1');
+      o.ip = [+cp.ch[0].rms.toFixed(4), +s.RES.comp[s.find('RL').id].Ir.toFixed(4), scU(c, 0), scopeFloat(c)[0], warnList().some(x => x[1].includes('เกินพิกัดโพรบ'))];
+      s.load('rectifier'); s.run(1); c = s.find('OSC1'); c.cp1 = 'RL'; c.cp2 = 'C1'; c.tdiv = 0.005; cp = s.scope('OSC1');
+      o.ip.push(s.RES.trans, +cp.ch[0].avg.toFixed(3), +cp.ch[1].avg.toFixed(3), +cp.ch[1].max.toFixed(2), +cp.ch[1].min.toFixed(2)); c.cp2 = ''; c.math = 'mul'; o.ip.push(scU(c, 2)); }
     s.load('arduino'); s.run(1.2); o.pwmSw = scopeSwitchers().map(x => [x.f, Math.round(x.duty*100)/100]);
 
     o.mcuErr = ['arduino','esp32','pico','ardsense','espgarden','counter','motor'].map(k => (s.load(k), s.run(0.3), s.find('U1')._vm.err)).filter(Boolean);
@@ -304,6 +309,8 @@ const path = require('path');
   near('parallel 1.5 A', r.parallel, 1.5, 0.01);
   near('mixed 54.5 mA', r.mixed, 0.0545, 0.0005);
   near('led 21 mA', r.led, 0.021, 0.0005);
+  checks.push(['สโคปโพรบกระแส: osc ⊂ RL = กระแส RL (A), ไม่เตือนลอย/พิกัด · rectifier ตามเวลา RL ≈ 144 mA, C1 เฉลี่ย 0 พีคชาร์จ > 1 A คายประจุ ≈ −0.16 A · Math V×A = W',
+    r.ip[0] === r.ip[1] && r.ip[0] > 0.1 && r.ip[2] === 'A' && !r.ip[3] && !r.ip[4] && r.ip[5] && Math.abs(r.ip[6] - 0.144) < 0.003 && Math.abs(r.ip[7]) < 0.01 && r.ip[8] > 1 && r.ip[9] < -0.1 && r.ip[9] > -0.25 && r.ip[10] === 'W', JSON.stringify(r.ip)]);
   checks.push(['dol: K1 ดูด', r.dolCoil === true, r.dolCoil]);
   near('dol: กระแสสตาร์ท ≈ 6 × In (15.3 A)', r.dolInrush, 15.3, 0.2);
   for (let k = 0; k < 3; k++) near('dol: กระแสเฟส ' + (k + 1) + ' หลังเร่งเครื่อง 2.55 A', r.dolI[k], 2.55, 0.02);
