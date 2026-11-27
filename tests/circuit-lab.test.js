@@ -636,7 +636,13 @@ const path = require('path');
       hw.scroll = await mp.evaluate(() => { const r = [document.scrollingElement.scrollTop === 0, document.querySelector('header').getBoundingClientRect().top === 0, $('#anwin').scrollTop > 50]; $('#anwin').hidden = true; return r; });
       hw.kb = await mp.evaluate(async () => { anOpen(); const inp = $('#anwin input[data-an="filter"]'); inp.focus(); document.scrollingElement.scrollTop = 276; inp.blur();
         await new Promise(r => setTimeout(r, 600)); const r = [scrollY === 0, getComputedStyle($('#insp')).visibility === 'hidden']; $('#anwin').hidden = true; return r; });
-      checks.push(['มือถือ: หัวหน้าต่างวิเคราะห์/สโคป/เทรนด์/ทดลองชุด ตัดบรรทัดได้ ปุ่ม ▶ จำลอง ฯลฯ อยู่ในจอไม่ถูก ✕ บัง · กดจำลอง/ปิดคีย์บอร์ดแล้วหน้าไม่เลื่อนค้าง แผ่นข้อมูลที่ปิดไม่โผล่', Object.values(hw).every(v => v && v.every(Boolean)), JSON.stringify(hw)]); }
+      hw.lg = await mp.evaluate(() => { document.querySelectorAll('#anwin,#scopewin,#trwin,#exwin').forEach(e => e.hidden = true); LG.on = true;
+        __sim.load(__sim.EX.dol.f()); setView('off'); const st = __sim.find('START'); st._pr = true; __sim.poke(); __sim.run(0.3); st._pr = false; __sim.poke(); __sim.run(3);
+        sel = {k:'c', c:__sim.find('H1')}; lgDraw(); const a = [!$('#lgraph').hidden, /21\.\d mA/.test($('#lgval').textContent), /PF 1\.00/.test($('#lgval').textContent)];
+        sel = {k:'c', c:__sim.find('M1')}; lgDraw(); a.push(/2\.55 A ×3/.test($('#lgval').textContent));
+        __sim.load(__sim.EX.series.f()); sel = {k:'c', c:__sim.find('H1')}; __sim.run(1); lgDraw(); a.push(LG.h.length > 5, /250 mA/.test($('#lgval').textContent));
+        sel = null; lgDraw(); a.push($('#lgraph').hidden); return a; });
+      checks.push(['มือถือ: หัวหน้าต่างวิเคราะห์/สโคป/เทรนด์/ทดลองชุด ตัดบรรทัดได้ ปุ่ม ▶ จำลอง ฯลฯ อยู่ในจอไม่ถูก ✕ บัง · กดจำลอง/ปิดคีย์บอร์ดแล้วหน้าไม่เลื่อนค้าง แผ่นข้อมูลที่ปิดไม่โผล่ · กราฟสด: H1 21.8 mA PF 1.00, M1 2.55 A ×3, series DC ประวัติ 250 mA, ไม่เลือก = ซ่อน', Object.values(hw).every(v => v && v.every(Boolean)), JSON.stringify(hw)]); }
       const am = await mp.evaluate(() => { const xs = [], y = []; for (let k = 0; k <= 1000; k++){ xs.push(k*1e-4); y.push(325*Math.sin(2*Math.PI*50*k*1e-4)); } const m = spMeas(xs, y);
         __sim.load(__sim.EX.pfc.f()); AN.sig = null; anOpen(); const ids = [...document.querySelectorAll('#anwin .anlist label')].map(l => l.textContent.trim()); AN.pt = 'I'; anPtApply($('#anwin'));
         const vis = [...document.querySelectorAll('#anwin .anlist label')].filter(l => l.style.display !== 'none').map(l => l.textContent.trim()); AN.pt = ''; $('#anwin').hidden = true;
