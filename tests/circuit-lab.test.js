@@ -301,6 +301,9 @@ const path = require('path');
     { o.mload = [0, 50, 100, 150].map(L => { s.load('pfc'); const m = s.find('M1'); m.load = L; s.run(5); const R = s.RES.comp[m.id]; return [+R.Ir.toFixed(2), +(R.P/(R.Vr*R.Ir)).toFixed(2), Math.round(motRpm(m))]; });
       s.load('dol'); const m = s.find('M1'); m.load = 220; const st = s.find('START'); st._pr = true; s.poke(); s.run(0.3); st._pr = false; s.poke(); s.run(6);
       o.mload.push([m._sp, s.S.comps.filter(c => c.t === 'mcb').some(c => !c.on)]); }
+    // กระแสกระชากตอนสับ C1 (pfc): สับที่ยอดแรงดัน (90°) → ยอดหลายร้อย A ≈ Vpk/√(L/C), ที่ศูนย์ (0°) เล็ก, รีแอกเตอร์ 200 µH ลดลง · อุปกรณ์ในเส้นทาง = C1 S1 PM1 แหล่งจ่าย
+    { const sw = (deg, lr) => { s.load('pfc'); s.run(2); const C1 = s.find('C1'); C1.lr = lr; INR.fix = deg; s.find('S1').on = true; s.solveNow(); s.run(0.05); return C1._inr ? Math.round(C1._inr.pk) : 0; };
+      o.inr = [sw(90, 0), sw(0, 0), sw(90, 200)]; o.inr.push([...INR.ev.comps.keys()].map(id => s.S.comps.find(x => x.id === id).n).sort().join(','), Math.round(INR.ev.f0)); INR.fix = null; }
     s.load('arduino'); s.run(1.2); o.pwmSw = scopeSwitchers().map(x => [x.f, Math.round(x.duty*100)/100]);
 
     o.mcuErr = ['arduino','esp32','pico','ardsense','espgarden','counter','motor'].map(k => (s.load(k), s.run(0.3), s.find('U1')._vm.err)).filter(Boolean);
@@ -317,6 +320,8 @@ const path = require('path');
     r.ip[0] === r.ip[1] && r.ip[0] > 0.1 && r.ip[2] === 'A' && !r.ip[3] && !r.ip[4] && r.ip[5] && Math.abs(r.ip[6] - 0.144) < 0.003 && Math.abs(r.ip[7]) < 0.01 && r.ip[8] > 1 && r.ip[9] < -0.1 && r.ip[9] > -0.25 && r.ip[10] === 'W', JSON.stringify(r.ip)]);
   checks.push(['ภาระทางกลมอเตอร์: pfc 0% → 4.66 A PF 0.12, 50% → PF 0.44, 100% → 7.16 A PF 0.65 1440 rpm, 150% → 9.76 A รอบตก · dol 220% มอเตอร์ติด เบรกเกอร์ตัด',
     r.mload[0][0] === 4.66 && r.mload[0][1] === 0.12 && r.mload[1][1] === 0.44 && r.mload[2][0] === 7.16 && r.mload[2][1] === 0.65 && r.mload[2][2] === 1440 && r.mload[3][0] === 9.76 && r.mload[3][2] < 1440 && r.mload[4][0] === 0 && r.mload[4][1], JSON.stringify(r.mload)]);
+  checks.push(['กระแสกระชากสับตัวเก็บประจุ: ที่ยอดแรงดัน ≈ 300–600 A, ที่ศูนย์ < 40 A, รีแอกเตอร์ 200 µH ลดเหลือ < 1/2 · เส้นทาง C1/S1/PM1/แหล่งจ่าย',
+    r.inr[0] > 300 && r.inr[0] < 600 && r.inr[1] < 40 && r.inr[2] < r.inr[0]/2 && r.inr[3] === ['C1', 'PM1', 'S1', 'การไฟฟ้า'].sort().join(','), JSON.stringify(r.inr)]);
   checks.push(['dol: K1 ดูด', r.dolCoil === true, r.dolCoil]);
   near('dol: กระแสสตาร์ท ≈ 6 × In (15.3 A)', r.dolInrush, 15.3, 0.2);
   for (let k = 0; k < 3; k++) near('dol: กระแสเฟส ' + (k + 1) + ' หลังเร่งเครื่อง 2.55 A', r.dolI[k], 2.55, 0.02);

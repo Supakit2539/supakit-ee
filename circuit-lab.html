@@ -3161,7 +3161,7 @@ function settle(){
     needSolve = false; solveAll(); discrete(0);
   }
 }
-function step(dt){ simT += dt; continuous(dt); facStep(dt); discrete(dt); settle(); if (trApplicable()) trRun(dt); else TR.active = false; scopeRecord(); trendRec(); lgRec(); }
+function step(dt){ simT += dt; continuous(dt); facStep(dt); discrete(dt); settle(); capInrush(); if (trApplicable()) trRun(dt); else TR.active = false; scopeRecord(); trendRec(); lgRec(); }
 function poke(){ needSolve = true; settle(); }
 
 /* ============================================================
@@ -5568,7 +5568,7 @@ const F = {
   pbnc:[NMF,['col','สีปุ่ม','sel',{red:'แดง',green:'เขียว',yellow:'เหลือง',blue:'น้ำเงิน',black:'ดำ',white:'ขาว'}]],
   bat:[NMF,['V','แรงดัน','num','V'],['ri','ความต้านทานภายใน','num','Ω']],
   acs:[NMF,['V','แรงดัน (RMS)','num','V'],['f','ความถี่','num','Hz'],['ph','มุมเฟส','num','°']],
-  cap:[NMF,['C','ความจุ','num','µF'],['Vr','พิกัดแรงดัน','num','V'],['pol','ชนิดมีขั้ว (อิเล็กโทรไลต์)','bool','มีขั้ว']], ind:[NMF,['Lh','ความเหนี่ยวนำ','num','H'],['R','ความต้านทานขดลวด','num','Ω']],
+  cap:[NMF,['C','ความจุ','num','µF'],['Vr','พิกัดแรงดัน','num','V'],['pol','ชนิดมีขั้ว (อิเล็กโทรไลต์)','bool','มีขั้ว'],['lr','รีแอกเตอร์จำกัดกระแสกระชาก','num','µH']], ind:[NMF,['Lh','ความเหนี่ยวนำ','num','H'],['R','ความต้านทานขดลวด','num','Ω']],
   am:[NMF,['mode','โหมดวัด','sel',{rms:'True RMS (AC+DC)',dc:'DC (ค่าเฉลี่ย)',ac:'AC (RMS ส่วนกระเพื่อม)'}]], vm:[NMF,['mode','โหมดวัด','sel',{rms:'True RMS (AC+DC)',dc:'DC (ค่าเฉลี่ย)',ac:'AC (RMS ส่วนกระเพื่อม)'}]], gnd:[],
   cd4017:[NMF,['fam','ตระกูลไอซี','sel',{'4000':'CD4000 (CMOS 3–18 V)',HC:'74HC (CMOS 2–6 V)'}]],
   hc595:[NMF,['fam','ตระกูลไอซี','sel',{HC:'74HC (CMOS 2–6 V)',LS:'74LS (TTL 5 V)'}]],
@@ -5852,6 +5852,8 @@ function compHTML(c){
   if (c.t === 'human') st.push(R.Ir > 0.03 ? tag('bad','อันตรายถึงชีวิต') : R.Ir > 0.01 ? tag('bad','กล้ามเนื้อเกร็ง ปล่อยมือไม่ได้') : R.Ir > 0.001 ? tag('warn','รู้สึกเจ็บ') : tag('ok','ปลอดภัย'));
   if (c.t === 'estop') st.push(c.act ? tag('bad','ถูกกด — วงจรตัด (หมุนเพื่อปลด)') : tag('ok','ปกติ'));
   if ((c.t === 'motor1' || c.t === 'pump') && R.Ir > 0) add('กระแสพิกัด', fmt(c.P*1000/(c.eff*c.pf*c.V), 'A'));
+  if (c.t === 'cap' && c._inr){ const q = c._inr; add('กระแสกระชากล่าสุด', fmt(q.pk, 'A') + ' (' + q.x + '× ของยอดปกติ) · สั่น ' + fmt(q.f0, 'Hz'));
+    st.push(q.x > 100 ? tag('bad', 'กระแสกระชากเกิน 100 เท่า — ใส่รีแอกเตอร์จำกัดกระแส (lr) หรือคอนแทกเตอร์สำหรับตัวเก็บประจุ') : tag('ok', 'กระแสกระชากอยู่ในเกณฑ์')); }
   if (['motor1', 'pump', 'motor3', 'motor6'].includes(c.t)){ const L = motLoad(c), n = motRpm(c);
     add('ภาระทางกล', Math.round(L*100) + '% · แรงบิด ' + (c.P*1000*L/(2*Math.PI*1500/60)).toFixed(1) + ' N·m');
     if (c._run) add('ความเร็วรอบ', Math.round(n) + ' rpm' + (n > 0 ? ' (สลิป ' + (L*4).toFixed(1) + '%)' : ''));
@@ -8644,6 +8646,33 @@ function sigVal(str){
   const v = c[m[2]] ?? c['_' + m[2]]; return typeof v === 'number' ? v : typeof v === 'boolean' ? +v : NaN;
 }
 function trendSigs(){ return trendCfg().sig.map(x => String(x || '').trim()); }
+/* ---------- กระแสกระชากตอนสับตัวเก็บประจุเข้าไฟ AC ----------
+   ตัวเก็บประจุว่างถูกต่อคร่อมไฟบ้านที่มุมใดก็ได้ → แรงดันกระโดดจาก 0 → ไหลผ่านความเหนี่ยวนำของระบบ (หม้อแปลง+สาย ≈ 20 µH + รีแอกเตอร์ lr) เกิด LC สั่นหน่วง
+   วงจร RLC อนุกรม: vc(0) = 0, i(0) = 0 → vc = vss + e^(−αt)(A cos ωd t + B sin ωd t) · ยอด ≈ v0/√(L/C) · ใช้กับไฟ AC แบบเฟเซอร์เท่านั้น (โหมดตามเวลาจำลองเองอยู่แล้ว)
+   อุปกรณ์ที่กระแสตัวเก็บประจุไหลผ่าน (สวิตช์อนุกรม, มิเตอร์, แหล่งจ่าย) ได้รูปคลื่นกระชากเดียวกันในกราฟสด */
+const INR = {Ls:20e-6, R:0.1, ev:null};
+function capInrush(){
+  if (RES.trans) return; const f = RES.f || 50, w = 2*Math.PI*f;
+  const Vsrc = []; for (const o of S.comps){ if (o.t === 'src1' || o.t === 'acs') Vsrc.push(o.V); if (o.t === 'src3') Vsrc.push(o.V, o.V/SQ3); }
+  for (const c of S.comps){ if (c.t !== 'cap') continue; const R = RES.comp[c.id]; if (!R || !R.v) continue;
+    const mag = Math.hypot(R.v.r || 0, R.v.i || 0), was = c._vmag; c._vmag = mag;
+    if (was === undefined || was > 1 || mag < 5 || c._blown || !Vsrc.some(v => Math.abs(mag - v) < 0.1*v)) continue;     // ต้องคร่อมไฟหลักโดยตรง
+    const C = (c.C || 0)*1e-6, L = INR.Ls + (+c.lr || 0)*1e-6, Rr = INR.R; if (!(C > 0)) continue;
+    const al = Rr/(2*L), w0 = 1/Math.sqrt(L*C), wd = Math.sqrt(Math.max(1, w0*w0 - al*al)), th = INR.fix != null ? INR.fix*Math.PI/180 : Math.random()*2*Math.PI;   // มุมขณะสับ: สุ่มเหมือนจริง (INR.fix = องศาคงที่ สำหรับทดสอบ)
+    const vss0 = lgAt(R.v, w, th/w), iss0 = lgAt(R.i, w, th/w), A = -vss0, B = (-iss0/C + al*A)/wd;
+    const itr = t => t < 0 ? 0 : C*Math.exp(-al*t)*((-al*A + wd*B)*Math.cos(wd*t) + (-al*B - wd*A)*Math.sin(wd*t));
+    const vtr = t => t < 0 ? 0 : Math.exp(-al*t)*(A*Math.cos(wd*t) + B*Math.sin(wd*t));
+    let pk = 0; for (let k = 0; k <= 400; k++){ const t = k/400*Math.min(5e-3, 6/al); const v = Math.abs(iss0 + itr(t)); if (v > pk) pk = v; }
+    // อุปกรณ์ที่กระแสนี้ไหลผ่าน: กระแสเฟเซอร์ ≈ ±Ic (อนุกรม) หรือแหล่งจ่าย/มิเตอร์ (มีกระแสอื่นรวมอยู่)
+    const Ic = R.i, sim = (a, b) => Math.hypot((a.r || 0) - (b.r || 0), (a.i || 0) - (b.i || 0)) < 0.03*Math.hypot(Ic.r, Ic.i);
+    const comps = new Map([[c.id, {s:1, ser:true}]]);
+    for (const o of S.comps){ if (o === c) continue; const pr = lgPairs(o); if (!pr || pr.length !== 1) continue; const ix = pr[0][1];
+      if (sim(ix, Ic)) comps.set(o.id, {s:1, ser:true}); else if (sim(ix, lgNeg(Ic))) comps.set(o.id, {s:-1, ser:true});
+      else if (['src1', 'acs', 'pmeter', 'rcd'].includes(o.t)){ const d1 = Math.hypot(ix.r - Ic.r, ix.i - Ic.i), d2 = Math.hypot(ix.r + Ic.r, ix.i + Ic.i); comps.set(o.id, {s:d1 < d2 ? 1 : -1, ser:false}); } }
+    c._inr = {pk, t:simT, v0:vss0, f0:wd/(2*Math.PI), x:+(pk/Math.max(1e-9, Math.SQRT2*Math.hypot(Ic.r, Ic.i))).toFixed(0)};
+    INR.ev = {c, th, w, itr, vtr, comps, wall:performance.now(), pk, f0:wd/(2*Math.PI)};
+  }
+}
 /* ---------- กราฟสด (#lgraph): แรงดัน กระแส กำลัง ของอุปกรณ์ที่เลือก ซ้อนในกราฟเดียว ----------
    AC: 2 คาบ ทริกที่จุดตัดศูนย์ขาขึ้นของแรงดัน (เฟเซอร์ หรือบัฟเฟอร์โหมดตามเวลา) · DC: ประวัติ 10 s ล่าสุด (LG.h บันทึกทุก step)
    อุปกรณ์ 3 เฟส (src3, motor3/6): แรงดันเฟส U + กระแส U V W + กำลังรวมขณะหนึ่ง */
@@ -8676,8 +8705,18 @@ function lgDraw(){
   const ac = pr.some(([v, i]) => Math.hypot(v.r || 0, v.i || 0) > 1e-3 || Math.hypot(i.r || 0, i.i || 0) > 1e-6);
   // สัญญาณตามเวลา
   let Tw, xs = [], tr = [];
-  const N = 240;
-  if (ac){ Tw = 2/f; const v0 = pr[0][0], t0 = -Math.atan2(v0.i || 0, v0.r || 0)/w;                               // ทริก: แรงดันตัดศูนย์ขาขึ้น
+  const N = 240, ev = INR.ev && performance.now() - INR.ev.wall < 6000 && INR.ev.comps.get(c.id);
+  if (ac && ev && pr.length === 1){
+    // จับภาพตอนสับ: −2 ms ถึง +8 ms รอบจุดสับ (ละเอียดพอเห็นการสั่นความถี่สูง)
+    const E = INR.ev, Ic = RES.comp[E.c.id].i, [v, i] = pr[0], M = 1200; Tw = 0.01; const tb = -0.002;
+    const pre = ev.ser ? null : {d:(i.d || 0) - ev.s*(Ic.d || 0), r:(i.r || 0) - ev.s*(Ic.r || 0), i:(i.i || 0) - ev.s*(Ic.i || 0)};
+    for (let n = 0; n <= M; n++) xs.push(n/M*Tw);
+    const tt = x => E.th/w + tb + x, rel = x => tb + x;
+    const V = xs.map(x => c === E.c ? (rel(x) < 0 ? 0 : lgAt(v, w, tt(x)) + E.vtr(rel(x))) : lgAt(v, w, tt(x)));
+    const I = xs.map(x => rel(x) < 0 ? (pre ? lgAt(pre, w, tt(x)) : 0) : lgAt(i, w, tt(x)) + ev.s*E.itr(rel(x)));
+    tr = [{u:'V', nm:'V', col:LG_COL.V, y:V}, {u:'A', nm:'I', col:LG_COL.I[0], y:I}, {u:'W', nm:'P', col:LG_COL.P, y:V.map((a, k) => a*I[k])}];
+    LG.evlab = `⚡ สับ ${E.c.n} ที่มุม ${Math.round(E.th*180/Math.PI)}° · กระชากยอด ${fmt(E.pk, 'A')} · สั่น ${fmt(E.f0, 'Hz')}`; LG.ev0 = -tb; }
+  else if (ac){ LG.evlab = null; Tw = 2/f; const v0 = pr[0][0], t0 = -Math.atan2(v0.i || 0, v0.r || 0)/w;                               // ทริก: แรงดันตัดศูนย์ขาขึ้น
     const trv = RES.trans && TR.tw && isTwo(c) && c._n ? (() => { const fi = trCurAt(c, simT); if (fi == null) return null; const tE = TR.tw.tEnd;
       return {v:t => trNodeAt(c._n[0], t) - trNodeAt(c._n[1], t), i:t => trCurAt(c, t), t0:tE - Tw}; })() : null;
     for (let n = 0; n <= N; n++) xs.push(n/N*Tw);
@@ -8685,7 +8724,7 @@ function lgDraw(){
     else { tr.push({u:'V', nm:three ? 'V (U)' : 'V', col:LG_COL.V, y:xs.map(t => lgAt(pr[0][0], w, t + t0))});
       pr.forEach(([, i], k) => tr.push({u:'A', nm:three ? 'I ' + 'UVW'[k] : 'I', col:LG_COL.I[k], y:xs.map(t => lgAt(i, w, t + t0))}));
       tr.push({u:'W', nm:three ? 'P รวม' : 'P', col:LG_COL.P, y:xs.map(t => pr.reduce((a, [v, i]) => a + lgAt(v, w, t + t0)*lgAt(i, w, t + t0), 0))}); } }
-  else { const h = LG.h; Tw = 10; const tE = h.length ? h[h.length - 1][0] : simT; xs = h.map(e => e[0] - (tE - Tw));
+  else { LG.evlab = null; const h = LG.h; Tw = 10; const tE = h.length ? h[h.length - 1][0] : simT; xs = h.map(e => e[0] - (tE - Tw));
     tr = [{u:'V', nm:'V', col:LG_COL.V, y:h.map(e => e[1])}, {u:'A', nm:'I', col:LG_COL.I[0], y:h.map(e => e[2])}, {u:'W', nm:'P', col:LG_COL.P, y:h.map(e => e[3])}]; }
   // ค่าอ่าน
   const P = R.P != null ? (scIsrc(c) || c.t === 'src3' ? -R.P : R.P) : tr[tr.length - 1].y.reduce((a, b) => a + b, 0)/Math.max(1, tr[tr.length - 1].y.length);
@@ -8704,7 +8743,13 @@ function lgDraw(){
     g.textAlign = 'right'; g.fillStyle = LG_COL.V; g.fillText(fmtAx((d - sc.k)*sc.s[0], 'V'), L - 4, y);
     g.textAlign = 'left'; const dy = d === 0 ? -6 : 0; g.fillStyle = LG_COL.I[0]; g.fillText(fmtAx((d - sc.k)*sc.s[1], 'A'), W - Rr + 4, y - 5 + dy); g.fillStyle = LG_COL.P; g.fillText(fmtAx((d - sc.k)*sc.s[2], 'W'), W - Rr + 4, y + 6 + dy); }
   g.strokeStyle = K.muted; g.strokeRect(L, yd(D), W - L - Rr, yd(0) - yd(D));
-  g.fillStyle = K.muted; g.textAlign = 'center'; g.textBaseline = 'top'; for (let q = 0; q <= 4; q++){ g.textAlign = q === 4 ? 'right' : q === 0 ? 'left' : 'center'; g.fillText(ac ? fmtAx(q/4*Tw, 's') : (q === 4 ? 'ตอนนี้' : '−' + fmtAx((1 - q/4)*Tw, 's')), q === 4 ? W - Rr : q === 0 ? L : xm(q/4*Tw), H - bot + 3); }
+  if (LG.evlab){ const X = xm(LG.ev0); g.save(); g.setLineDash([3, 3]); g.strokeStyle = '#f59e0b'; g.beginPath(); g.moveTo(X, yd(D)); g.lineTo(X, yd(0)); g.stroke(); g.restore();
+    g.fillStyle = '#f59e0b'; g.textAlign = 'left'; g.textBaseline = 'bottom'; g.fillText('สับ', X + 3, yd(0) - 2);
+    g.font = "600 10.5px 'IBM Plex Sans Thai',sans-serif"; g.textAlign = 'right'; g.textBaseline = 'top'; g.fillStyle = '#b45309'; g.fillText(LG.evlab, W - Rr - 4, yd(D) + 16);
+    g.font = "10px 'IBM Plex Mono',monospace"; g.textBaseline = 'middle'; }
+  g.fillStyle = K.muted; g.textAlign = 'center'; g.textBaseline = 'top';
+  if (LG.evlab) for (let q = 0; q <= 5; q++){ const tq = q*0.002; g.textAlign = q === 5 ? 'right' : q === 0 ? 'left' : 'center'; g.fillText(fmtAx(tq - LG.ev0, 's').replace('0s', '0'), q === 5 ? W - Rr : q === 0 ? L : xm(tq), H - bot + 3); }
+  else for (let q = 0; q <= 4; q++){ g.textAlign = q === 4 ? 'right' : q === 0 ? 'left' : 'center'; g.fillText(ac ? (LG.evlab ? fmtAx(q/4*Tw - LG.ev0, 's') : fmtAx(q/4*Tw, 's')) : (q === 4 ? 'ตอนนี้' : '−' + fmtAx((1 - q/4)*Tw, 's')), q === 4 ? W - Rr : q === 0 ? L : xm(q/4*Tw), H - bot + 3); }
   for (const t of [...tr].sort((a, b) => (b.u === 'W') - (a.u === 'W'))){ const j = units.indexOf(t.u); g.strokeStyle = t.col; g.lineWidth = t.u === 'W' ? 1.4 : 1.8; g.setLineDash(t.u === 'W' ? [5, 3] : []); g.beginPath(); let pen = false;
     t.y.forEach((v, n) => { if (!isFinite(v) || xs[n] < 0){ pen = false; return; } const X = xm(xs[n]), Y = yd(sc.k + v/sc.s[j]); if (pen) g.lineTo(X, Y); else { g.moveTo(X, Y); pen = true; } }); g.stroke(); } g.setLineDash([]);
   // ตำนาน
