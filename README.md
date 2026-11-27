@@ -6,11 +6,11 @@
 
 ## เปิดใช้งาน
 - เปิดไฟล์ `circuit-lab.html` ในเบราว์เซอร์ได้ทันที (ไม่มี build step, ไม่มี dependency)
-- หรือผ่าน GitHub Pages: `https://supakit2539.github.io/-/` (หน้า `index.html` ส่งต่อเข้าแอปเอง)
+- หรือผ่าน GitHub Pages: `https://supakit2539.github.io/supakit-ee/` (หน้า `index.html` ส่งต่อเข้าแอปเอง)
 
 ## ติดตั้งเป็นแอปบนโทรศัพท์ (PWA)
 1. เปิด GitHub Pages: **Settings → Pages → Build and deployment → Source: Deploy from a branch** เลือก branch และโฟลเดอร์ `/ (root)` แล้วกด Save
-2. เปิด `https://supakit2539.github.io/-/circuit-lab.html` บนโทรศัพท์
+2. เปิด `https://supakit2539.github.io/supakit-ee/circuit-lab.html` บนโทรศัพท์
 3. กดปุ่ม **📲** ที่แถบด้านบน หรือปุ่ม **ติดตั้ง** ในแถบที่ขึ้นด้านล่างจอ
    - Android (Chrome): ขึ้นหน้าต่างติดตั้งของเบราว์เซอร์ → **ติดตั้ง**
    - iPhone/iPad (Safari): แอปจะบอกวิธี — ปุ่มแชร์ → **เพิ่มไปยังหน้าจอโฮม**

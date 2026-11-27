@@ -1,7 +1,7 @@
 // Service worker ของ Circuit Lab: ใช้งานออฟไลน์ได้หลังเปิดครั้งแรก
 // หน้าแอป (HTML) = เครือข่ายก่อน แล้วจึงใช้สำเนาในเครื่อง (ได้เวอร์ชันใหม่เสมอเมื่อออนไลน์)
 // ไฟล์อื่น (ไอคอน, manifest, ฟอนต์ Google) = สำเนาในเครื่องก่อน แล้วอัปเดตเบื้องหลัง
-const CACHE = 'circuit-lab-v2';
+const CACHE = 'circuit-lab-v3';
 const CORE = ['circuit-lab.html', 'circuit-lab.webmanifest', 'icons/circuit-lab-192.png', 'icons/circuit-lab-512.png', 'icons/circuit-lab-maskable-512.png', 'icons/circuit-lab-apple-180.png'];
 
 self.addEventListener('install', e => {
@@ -19,7 +19,8 @@ self.addEventListener('fetch', e => {
   if (req.mode === 'navigate' || url.pathname.endsWith('.html')){
     // เก็บสำเนาเฉพาะหน้าแอปเอง (หน้าอื่น เช่น index.html ที่ส่งต่อ ไม่ทับสำเนาของแอป)
     const app = url.pathname.endsWith('/circuit-lab.html');
-    e.respondWith(fetch(req).then(r => { if (r.ok && app){ const cp = r.clone(); caches.open(CACHE).then(c => c.put('circuit-lab.html', cp)); } return r; })
+    // cache:'no-cache' = ถามเซิร์ฟเวอร์ทุกครั้ง (ไม่ใช้สำเนา HTTP ที่ค้าง 10 นาทีของ GitHub Pages) → เปิดแอปได้รุ่นล่าสุดทันที
+    e.respondWith(fetch(req, {cache:'no-cache'}).then(r => { if (r.ok && app){ const cp = r.clone(); caches.open(CACHE).then(c => c.put('circuit-lab.html', cp)); } return r; })
       .catch(() => caches.match('circuit-lab.html')));
     return;
   }

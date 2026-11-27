@@ -4,7 +4,7 @@
 PLC (แลดเดอร์ + ข้อความ), HMI ผ่าน RS-485, ระบบปั๊มน้ำ–ถังน้ำ ไมโครคอนโทรลเลอร์ (Arduino Uno, ESP32, Raspberry Pi Pico) เซนเซอร์ (บอร์ดและอุตสาหกรรม) อุปกรณ์อิเล็กทรอนิกส์ ออสซิลโลสโคป และมุมมองโรงงาน 3D ที่ควบคุมด้วยวงจร/PLC บนแผง
 ผู้ใช้คนไทย: ข้อความใน UI เป็นภาษาไทยทั้งหมด
 
-> ย้ายมาจาก repo `Supakit2539/claude-rc` (ประวัติ commit เดิมอยู่ที่นั่น) · `index.html` เป็นเพียงหน้าส่งต่อไป `circuit-lab.html` (หน้าแรกของ GitHub Pages)
+> repo `Supakit2539/supakit-ee` (เดิมชื่อ `-`, Pages: https://supakit2539.github.io/supakit-ee/) · ย้ายมาจาก repo `Supakit2539/claude-rc` (ประวัติ commit เดิมอยู่ที่นั่น) · `index.html` เป็นเพียงหน้าส่งต่อไป `circuit-lab.html` (หน้าแรกของ GitHub Pages)
 
 ## ไฟล์
 - `circuit-lab.html` — ทั้งแอปอยู่ในไฟล์เดียว (HTML + CSS + JS, ไม่มี build step, ไม่มี dependency)
@@ -14,6 +14,7 @@ PLC (แลดเดอร์ + ข้อความ), HMI ผ่าน RS-485,
 - แอปบนโทรศัพท์ (PWA): `circuit-lab.webmanifest`, `circuit-lab-sw.js` (service worker: HTML เครือข่ายก่อน/ไฟล์อื่นสำเนาในเครื่องก่อน รวมฟอนต์ Google, แคช `circuit-lab-vN` — เพิ่มเลขเมื่อเปลี่ยนรายการ CORE),
   `icons/circuit-lab-{192,512,maskable-512,apple-180}.png` · `pwaInit()` ใส่ลิงก์ manifest/ไอคอนและลงทะเบียน SW เฉพาะเมื่อเปิดผ่าน http(s) ที่ไม่ใช่ claude.ai (`pwaHost`);
   ปุ่มติดตั้ง (`beforeinstallprompt` → `pwaInstall`, iOS แสดงวิธี "เพิ่มไปยังหน้าจอโฮม") ในเมนูไฟล์ `#finstall` และ ⋯ เมนู · standalone ใช้ safe-area ที่ส่วนหัว
+  `APP_VER` (ต้นสคริปต์) แสดงท้าย ⋯ เมนู — **เพิ่มเลขทุกครั้งที่ push ของใหม่** · SW ขอ HTML แบบ `cache:'no-cache'` (ไม่ติดสำเนา HTTP 10 นาที)
   ปุ่มไอคอน 📲 ที่ส่วนหัว `#bInst` (โทรศัพท์แสดงเป็นไอคอนอย่างเดียว) + แถบชวนติดตั้ง `#instbar` บนโทรศัพท์ (ขึ้นหลัง 2.5 s, ✕ = เลื่อนไป 7 วันใน localStorage `circuit-lab-instbar`) — `pwaRefresh()` แสดงทั้งหมดเมื่อ `pwaCanInstall()`
 
 ## โครงสร้างโค้ด (ตามลำดับในไฟล์ `<script>`)
