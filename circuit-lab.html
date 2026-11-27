@@ -421,7 +421,7 @@ button,select,.pi,summary{touch-action:manipulation}
 <script>
 'use strict';
 // รุ่นของแอป (เพิ่มทุกครั้งที่ปล่อยของใหม่) — แสดงท้ายเมนู ⋯ และเมนูไฟล์ เพื่อเช็กว่าโทรศัพท์โหลดรุ่นล่าสุดแล้ว
-const APP_VER = '2026.11.28-1';
+const APP_VER = '2026.11.28-2';
 /* ============================================================
    1. ค่าคงที่และชนิดอุปกรณ์
    ============================================================ */
@@ -495,10 +495,10 @@ const T = {
   am:    {nm:'แอมมิเตอร์',            ic:'A',  pre:'A',  d:{mode:'rms'}},
   vm:    {nm:'โวลต์มิเตอร์',          ic:'V',  pre:'V',  d:{mode:'rms'}},
   gnd:   {nm:'กราวด์',               ic:'⏚',  pre:'',   d:{}, pins:[[0,0,'']], box:[-0.4,0,0.4,0.55]},
-  src1:  {nm:'ไฟบ้าน 1 เฟส',          ic:'~',  pre:'G',  d:{V:230, f:50}, pins:[[0,1,'L'],[1,1,'N']], box:[-0.6,-1,1.6,1]},
-  src3:  {nm:'ไฟ 3 เฟส',             ic:'3~', pre:'G',  d:{V:400, f:50, seq:1}, pins:[[-1,1,'L1'],[0,1,'L2'],[1,1,'L3'],[2,1,'N']], box:[-1.6,-1,2.6,1]},
+  src1:  {nm:'ไฟบ้าน 1 เฟส',          ic:'~',  pre:'G',  d:{V:230, f:50, zpct:4, xr:4}, pins:[[0,1,'L'],[1,1,'N']], box:[-0.6,-1,1.6,1]},
+  src3:  {nm:'ไฟ 3 เฟส',             ic:'3~', pre:'G',  d:{V:400, f:50, seq:1, zpct:4, xr:4}, pins:[[-1,1,'L1'],[0,1,'L2'],[1,1,'L3'],[2,1,'N']], box:[-1.6,-1,2.6,1]},
   acs:   {nm:'แหล่งจ่าย AC',          ic:'∼',  pre:'G',  d:{V:230, f:50, ph:0}},
-  mcb:   {nm:'เบรกเกอร์',             ic:'⌐x', pre:'F',  d:{In:10, on:true}},
+  mcb:   {nm:'เบรกเกอร์',             ic:'⌐x', pre:'F',  d:{In:10, on:true, icu:6}},
   fuse:  {nm:'ฟิวส์',                ic:'▭-', pre:'F',  d:{In:2}},
   motor1:{nm:'มอเตอร์ 1 เฟส',         ic:'M',  pre:'M',  d:{V:230, P:0.37, pf:0.75, eff:0.7}},
   fluo:  {nm:'หลอดฟลูออเรสเซนต์',      ic:'═',  pre:'H',  d:{V:230, P:36, pf:0.5}},
@@ -902,14 +902,14 @@ const MODELS = {
     {id:'k22n', nm:'ปุ่มกด NC สีดำ 22 mm', p:{col:'black'}},
   ],
   mcb: [
-    {id:'b6', nm:'MCB 1P B6', sh:'B6', p:{In:6, curve:'B'}, spec:{'Icu':'6 kA', 'ใช้งาน':'วงจรอิเล็กทรอนิกส์/ไฟแสงสว่าง'}},
-    {id:'c10', nm:'MCB 1P C10', sh:'C10', p:{In:10, curve:'C'}, spec:{'Icu':'6 kA', 'ใช้งาน':'วงจรแสงสว่าง'}},
-    {id:'c16', nm:'MCB 1P C16', sh:'C16', p:{In:16, curve:'C'}, spec:{'Icu':'6 kA', 'ใช้งาน':'เต้ารับ (สาย 2.5 mm²)'}},
-    {id:'c20', nm:'MCB 1P C20', sh:'C20', p:{In:20, curve:'C'}, spec:{'Icu':'6 kA'}},
-    {id:'c32', nm:'MCB 1P C32', sh:'C32', p:{In:32, curve:'C'}, spec:{'Icu':'6 kA', 'ใช้งาน':'เครื่องทำน้ำอุ่น, แอร์ (สาย 6 mm²)'}},
-    {id:'c63', nm:'MCB 1P C63', sh:'C63', p:{In:63, curve:'C'}, spec:{'Icu':'10 kA', 'ใช้งาน':'เมนเบรกเกอร์'}},
-    {id:'d16', nm:'MCB 1P D16 (โหลดกระแสกระชากสูง)', sh:'D16', p:{In:16, curve:'D'}, spec:{'Icu':'10 kA', 'ใช้งาน':'มอเตอร์, หม้อแปลง'}},
-    {id:'mccb100', nm:'MCCB 100 A', sh:'MCCB100', p:{In:100, curve:'D'}, spec:{'Icu':'25 kA', 'ใช้งาน':'เมนตู้ไฟโรงงาน'}},
+    {id:'b6', nm:'MCB 1P B6', sh:'B6', p:{In:6, curve:'B', icu:6}, spec:{'Icu':'6 kA', 'ใช้งาน':'วงจรอิเล็กทรอนิกส์/ไฟแสงสว่าง'}},
+    {id:'c10', nm:'MCB 1P C10', sh:'C10', p:{In:10, curve:'C', icu:6}, spec:{'Icu':'6 kA', 'ใช้งาน':'วงจรแสงสว่าง'}},
+    {id:'c16', nm:'MCB 1P C16', sh:'C16', p:{In:16, curve:'C', icu:6}, spec:{'Icu':'6 kA', 'ใช้งาน':'เต้ารับ (สาย 2.5 mm²)'}},
+    {id:'c20', nm:'MCB 1P C20', sh:'C20', p:{In:20, curve:'C', icu:6}, spec:{'Icu':'6 kA'}},
+    {id:'c32', nm:'MCB 1P C32', sh:'C32', p:{In:32, curve:'C', icu:6}, spec:{'Icu':'6 kA', 'ใช้งาน':'เครื่องทำน้ำอุ่น, แอร์ (สาย 6 mm²)'}},
+    {id:'c63', nm:'MCB 1P C63', sh:'C63', p:{In:63, curve:'C', icu:10}, spec:{'Icu':'10 kA', 'ใช้งาน':'เมนเบรกเกอร์'}},
+    {id:'d16', nm:'MCB 1P D16 (โหลดกระแสกระชากสูง)', sh:'D16', p:{In:16, curve:'D', icu:10}, spec:{'Icu':'10 kA', 'ใช้งาน':'มอเตอร์, หม้อแปลง'}},
+    {id:'mccb100', nm:'MCCB 100 A', sh:'MCCB100', p:{In:100, curve:'D', icu:25}, spec:{'Icu':'25 kA', 'ใช้งาน':'เมนตู้ไฟโรงงาน'}},
   ],
   fuse: [
     {id:'gf05', nm:'ฟิวส์แก้ว 5×20 F 500 mA (ขาดเร็ว)', sh:'F500mA', p:{In:0.5, inst:2.5, tc:1}, spec:{'ใช้งาน':'ป้องกันวงจรอิเล็กทรอนิกส์'}},
@@ -989,12 +989,16 @@ const MODELS = {
     {id:'th220', nm:'ไฟ 220 V 50 Hz (มาตรฐานเดิม)', p:{V:220, f:50}},
     {id:'us120', nm:'ไฟ 120 V 60 Hz (อเมริกาเหนือ)', p:{V:120, f:60}},
     {id:'jp100', nm:'ไฟ 100 V 50 Hz (ญี่ปุ่นตะวันออก)', p:{V:100, f:50}},
+    {id:'thhome', nm:'ไฟบ้าน 230 V มีอิมพีแดนซ์ระบบจริง (Isc ≈ 1.8 kA)', sh:'บ้าน Isc 1.8kA', p:{V:230, f:50, kva:33, zpct:8, xr:2}, spec:{'ที่มา':'หม้อแปลงชุมชน 100 kVA + สายเข้าบ้าน', 'Isc ที่ตู้':'≈ 1.8 kA'}},
   ],
   src3: [
     {id:'th400', nm:'ไฟ 3 เฟส 400/230 V 50 Hz', p:{V:400, f:50}, spec:{'ระบบ':'TN-C-S, 4 สาย'}},
     {id:'th380', nm:'ไฟ 3 เฟส 380/220 V 50 Hz (มาตรฐานเดิม)', p:{V:380, f:50}},
     {id:'us480', nm:'ไฟ 3 เฟส 480/277 V 60 Hz', p:{V:480, f:60}},
     {id:'ind690', nm:'ไฟ 3 เฟส 690/400 V 50 Hz (โรงงาน)', p:{V:690, f:50}},
+    {id:'tr160', nm:'หม้อแปลง 160 kVA 22 kV/400 V Uk 4%', sh:'160kVA', p:{V:400, f:50, kva:160, zpct:4, xr:3}, spec:{'Isc ที่ขั้ว':'≈ 5.8 kA', 'กระแสพิกัด':'231 A'}},
+    {id:'tr500', nm:'หม้อแปลง 500 kVA 22 kV/400 V Uk 4%', sh:'500kVA', p:{V:400, f:50, kva:500, zpct:4, xr:5}, spec:{'Isc ที่ขั้ว':'≈ 18 kA', 'กระแสพิกัด':'722 A'}},
+    {id:'tr1000', nm:'หม้อแปลง 1000 kVA 22 kV/400 V Uk 6%', sh:'1000kVA', p:{V:400, f:50, kva:1000, zpct:6, xr:7}, spec:{'Isc ที่ขั้ว':'≈ 24 kA', 'กระแสพิกัด':'1443 A'}},
   ],
   bridge: [
     {id:'kbp206', nm:'บริดจ์ 2 A 600 V (KBP206)', sh:'2A 600V', p:{Vf:0.9, Imax:2, Vrrm:600}, spec:{'กระแสเฉลี่ย':'2 A', 'แรงดันย้อนกลับ':'600 V', 'แรงดันตก':'≈ 0.9 V ต่อไดโอด (ผ่าน 2 ตัว ≈ 1.8 V)'}},
@@ -1291,6 +1295,12 @@ function motY(c, V, S, pf, ac){
   const y = indLoad(V, S*m*ld, pfx, ac);
   return c._fs == null || !ac ? y : [y[0]/fs, y[1]/fs];
 }
+// อิมพีแดนซ์ของแหล่งจ่าย (หม้อแปลงจ่ายไฟ): kva ว่าง = เกือบอุดมคติ (R 0.05 Ω, L ระบบ 20 µH สำหรับกระแสกระชาก)
+// kva + zpct (%Z, Uk) + xr (X/R) → Z = %Z·V²/S (1 เฟส: ทั้งลูป L–N, 3 เฟส: ต่อเฟส) · Isc = V เฟส / |Z|
+function srcZ(c){ const kva = +c.kva || 0, w = 2*Math.PI*(c.f || 50);
+  if (!(kva > 0)) return {r:0.05, x:0, L:20e-6, isc:null, ideal:true};
+  const V = c.V, Z = Math.max(0.001, (+c.zpct || 4)/100)*V*V/(kva*1000), xr = Math.max(0, +c.xr || 4), r = Z/Math.sqrt(1 + xr*xr), x = r*xr;
+  return {r, x, L:x/w, Z, isc:(c.t === 'src3' ? V/SQ3 : V)/Z, ideal:false}; }
 // ภาระทางกลของมอเตอร์ (pu ของแรงบิดพิกัด, ฟิลด์ load %, ค่าเริ่มต้น 100)
 const motLoad = c => c.load == null || c.load === '' ? 1 : Math.max(0, +c.load || 0)/100;
 // ความเร็วรอบจริง: สลิปพิกัด ≈ 4% แปรตามภาระ · มอเตอร์ 4 ขั้ว (1500 rpm ที่ 50 Hz)
@@ -1429,10 +1439,10 @@ function solveAll(){
       if (a && b){ M(a-1,b-1,-r,-im); M(b-1,a-1,-r,-im); }
     };
     // แหล่งแรงดัน: v_p − v_m − rs·j = V, กระแส j ไหลจาก p ผ่านแหล่งไป m
-    const V = (p,m,j,vr,vi,rs) => {
+    const V = (p,m,j,vr,vi,rs,xs) => {
       if (p){ M(p-1,j,1,0); M(j,p-1,1,0); }
       if (m){ M(m-1,j,-1,0); M(j,m-1,-1,0); }
-      if (rs) M(j,j,-rs,0);
+      if (rs || (ac && xs)) M(j,j,-(rs || 0), ac ? -(xs || 0) : 0);
       zr[j] += vr; if (ac) zi[j] += vi;
     };
     const Z = j => M(j,j,1,0);
@@ -1457,10 +1467,10 @@ function solveAll(){
           V(n[0], n[1], j, ac ? q.pk/Math.SQRT2*Math.cos(a) : q.dc, ac ? q.pk/Math.SQRT2*Math.sin(a) : 0, Math.max(c.zo ?? 50, 0.05)); } break;
         case 'acs': { const a = (c.ph||0)*Math.PI/180;
           V(n[0], n[1], j, ac ? c.V*Math.cos(a) : 0, ac ? c.V*Math.sin(a) : 0, 0.05); } break;
-        case 'src1': Y(n[1], 0, GW, 0); V(n[0], n[1], j, ac ? c.V : 0, 0, 0.05); break;
-        case 'src3': { Y(n[3], 0, GW, 0); const vp = c.V/SQ3;
+        case 'src1': { const z = srcZ(c); Y(n[1], 0, GW, 0); V(n[0], n[1], j, ac ? c.V : 0, 0, z.r, z.x); } break;
+        case 'src3': { Y(n[3], 0, GW, 0); const vp = c.V/SQ3, z = srcZ(c);
           for (let k = 0; k < 3; k++){ const a = -k*(c.seq||1)*2*Math.PI/3;
-            V(n[k], n[3], j+k, ac ? vp*Math.cos(a) : 0, ac ? vp*Math.sin(a) : 0, 0.05); } } break;
+            V(n[k], n[3], j+k, ac ? vp*Math.cos(a) : 0, ac ? vp*Math.sin(a) : 0, z.r, z.x); } } break;
         case 'led':
           if (c._on && !c._blown && !ac) V(n[0], n[1], j, c.Vf, 0, 1);
           else { Z(j); Y(n[0], n[1], GOFF, 0); } break;
@@ -3074,7 +3084,7 @@ function trRun(dt){
       case 'bat': Vs(n[0], n[1], c._tj2, Math.max(c.ri, 1e-4)); break;
       case 'acs': Vs(n[0], n[1], c._tj2, 0.05); break;
       case 'fgen': Vs(n[0], n[1], c._tj2, Math.max(c.zo ?? 50, 0.05)); break;
-      case 'src1': Y(n[1], 0, GW); Vs(n[0], n[1], c._tj2, 0.05); break;
+      case 'src1': Y(n[1], 0, GW); Vs(n[0], n[1], c._tj2, srcZ(c).r); break;
       case 'xfmr': { const j = c._tj2, r = c.V2/c.V1, rs = 0.04*c.V2*c.V2/c.S;
         if (n[2]){ M(n[2]-1, j, 1); M(j, n[2]-1, 1); } if (n[3]){ M(n[3]-1, j, -1); M(j, n[3]-1, -1); }
         if (n[0]){ M(n[0]-1, j, -r); M(j, n[0]-1, -r); } if (n[1]){ M(n[1]-1, j, r); M(j, n[1]-1, r); } M(j, j, -rs); Y(n[0], n[1], 1e-5); } break;
@@ -5594,9 +5604,9 @@ const F = {
     ['hd','สวิงขาออกต่ำกว่า V+','num','V'],['ld','สวิงขาออกสูงกว่า V−','num','V'],['vmin','ไฟเลี้ยงต่ำสุด','num','V'],['vmax','ไฟเลี้ยงสูงสุด','num','V'],
     ['iq','กระแสนิ่ง','num','mA'],['isc','กระแสขาออกสูงสุด','num','mA'],['oc','ขาออก open collector','bool','คอมพาราเตอร์ (ต้องมี pull-up)']],
   bridge:[NMF,['Vf','แรงดันตกต่อไดโอด','num','V'],['Imax','กระแสเฉลี่ยสูงสุด','num','A'],['Vrrm','แรงดันย้อนกลับสูงสุด','num','V']],
-  src1:[NMF,['V','แรงดัน','num','V'],['f','ความถี่','num','Hz']],
-  src3:[NMF,['V','แรงดันระหว่างสาย','num','V'],['f','ความถี่','num','Hz'],['seq','ลำดับเฟส','sel',{'1':'L1→L2→L3','-1':'L1→L3→L2 (กลับ)'}]],
-  mcb:[NMF,['In','พิกัดกระแส','num','A'],['curve','เส้นโค้งการตัด','sel',{B:'B (3–5 × In)',C:'C (5–10 × In)',D:'D (10–20 × In)'}],['on','สถานะ','bool','ON']],
+  src1:[NMF,['V','แรงดัน','num','V'],['f','ความถี่','num','Hz'],['kva','หม้อแปลงจ่าย (ว่าง = แหล่งอุดมคติ)','num','kVA'],['zpct','อิมพีแดนซ์ Uk','num','%'],['xr','อัตราส่วน X/R','num','']],
+  src3:[NMF,['V','แรงดันระหว่างสาย','num','V'],['f','ความถี่','num','Hz'],['seq','ลำดับเฟส','sel',{'1':'L1→L2→L3','-1':'L1→L3→L2 (กลับ)'}],['kva','หม้อแปลงจ่าย (ว่าง = แหล่งอุดมคติ)','num','kVA'],['zpct','อิมพีแดนซ์ Uk','num','%'],['xr','อัตราส่วน X/R','num','']],
+  mcb:[NMF,['In','พิกัดกระแส','num','A'],['icu','พิกัดตัดกระแสลัดวงจร Icu','num','kA'],['curve','เส้นโค้งการตัด','sel',{B:'B (3–5 × In)',C:'C (5–10 × In)',D:'D (10–20 × In)'}],['on','สถานะ','bool','ON']],
   fuse:[NMF,['In','พิกัดกระแส','num','A'],['inst','ขาดทันทีที่','num','× In'],['tc','ค่าคงที่เวลาความร้อน','num','s']],
   motor1:[NMF,...MOT,['Ist','กระแสสตาร์ท (× In)','num','']], fluo:[NMF,['V','แรงดันพิกัด','num','V'],['P','กำลัง','num','W'],['pf','ตัวประกอบกำลัง','num','']],
   xfmr:[NMF,['V1','แรงดันปฐมภูมิ','num','V'],['V2','แรงดันทุติยภูมิ','num','V'],['S','พิกัด','num','VA']],
@@ -5846,6 +5856,17 @@ function renderInsp(){
   if (NOTES[c.t]) s += `<div class="note">${NOTES[c.t]}</div>`;
   h.innerHTML = s;
 }
+// ข้อมูลหม้อแปลงจ่ายไฟ: อิมพีแดนซ์, กระแสลัดวงจรที่ขั้ว, แรงดันตกขณะนี้, ภาระเทียบพิกัด
+function srcRows(c, R, add, st){ const z = srcZ(c); if (z.ideal){ add('แหล่งจ่าย', 'อุดมคติ (ใส่ขนาดหม้อแปลง kVA เพื่อดูกระแสลัดวงจรและแรงดันตก)'); return; }
+  const three = c.t === 'src3', Vn = three ? c.V/SQ3 : c.V, Vt = three ? Math.min(...[0, 1, 2].map(k => rms(sub(R.pv[k], R.pv[3])))) : R.V, dv = (Vn - Vt)/Vn*100;
+  const In = c.kva*1000/(three ? SQ3*c.V : c.V), Iload = three ? Math.max(...R.Iph) : R.I;
+  add('อิมพีแดนซ์ต่อเฟส', fmt(z.Z, 'Ω') + ` (R ${fmt(z.r, 'Ω')} + jX ${fmt(z.x, 'Ω')})`);
+  add('กระแสลัดวงจรที่ขั้ว Isc', fmt(z.isc, 'A')); add('กระแสพิกัดหม้อแปลง', fmt(In, 'A') + ' · ใช้อยู่ ' + Math.round(Iload/In*100) + '%');
+  add('แรงดันตกขณะนี้', dv.toFixed(1) + '%' + (three ? ' (เฟสที่ต่ำสุด)' : ''));
+  st.push(dv > 10 ? tag('bad', 'แรงดันตกเกิน 10% — มอเตอร์อาจสตาร์ทไม่ขึ้น หลอดไฟกะพริบ') : dv > 5 ? tag('warn', 'แรงดันตกเกิน 5%') : tag('ok', 'แรงดันตกอยู่ในเกณฑ์'));
+  if (Iload > In) st.push(tag('bad', 'หม้อแปลงจ่ายเกินพิกัด')); }
+// กระแสลัดวงจรที่ระบบจ่ายได้สูงสุด (A) — ใช้ตรวจพิกัดตัด Icu ของเบรกเกอร์
+function sysIsc(){ let m = 0; for (const o of S.comps) if (o.t === 'src1' || o.t === 'src3'){ const z = srcZ(o); if (!z.ideal) m = Math.max(m, z.isc); } return m; }
 function tag(cls, s){ return `<span class="tag ${cls}">${s}</span>`; }
 function compHTML(c){
   const R = RES.comp[c.id]; if (!R) return '';
@@ -5882,8 +5903,8 @@ function compHTML(c){
       const Sx = Math.hypot(R.P, R.Q); if (Sx > 1e-6) add('ตัวประกอบกำลัง', (Math.abs(R.P)/Sx).toFixed(2)); }
   } else switch (c.t){
     case 'src1': add('แรงดัน', fmt(R.V, 'V')); add('กระแส', fmt(R.I, 'A')); add('กำลังจริง', fmt(R.P, 'W')); add('กำลังรีแอกทีฟ', fmt(R.Q, 'var'));
-      if (Math.hypot(R.P, R.Q) > 1) add('ตัวประกอบกำลัง', (R.P/Math.hypot(R.P, R.Q)).toFixed(2)); break;
-    case 'src3': ['L1','L2','L3'].forEach((n, k) => add('กระแส ' + n, fmt(R.Iph[k], 'A'))); add('กำลังจริงรวม', fmt(R.P, 'W')); add('กำลังรีแอกทีฟรวม', fmt(R.Q, 'var')); break;
+      if (Math.hypot(R.P, R.Q) > 1) add('ตัวประกอบกำลัง', (R.P/Math.hypot(R.P, R.Q)).toFixed(2)); srcRows(c, R, add, st); break;
+    case 'src3': ['L1','L2','L3'].forEach((n, k) => add('กระแส ' + n, fmt(R.Iph[k], 'A'))); add('กำลังจริงรวม', fmt(R.P, 'W')); add('กำลังรีแอกทีฟรวม', fmt(R.Q, 'var')); srcRows(c, R, add, st); break;
     case 'k3': ['L1–T1','L2–T2','L3–T3'].forEach((n, k) => add(n, fmt(R.Ip[k], 'A'))); st.push(contactClosed(c.ref) ? tag('ok','หน้าสัมผัสปิด') : tag('warn','หน้าสัมผัสเปิด')); break;
     case 'motor3': ['U','V','W'].forEach((n, k) => add('กระแสขด ' + n, fmt(R.ph[k], 'A')));
       add('แรงดัน U–V / V–W / W–U', R.Vl.map(v => v.toFixed(0)).join(' / ') + ' V'); add('กำลังไฟฟ้า', fmt(R.P, 'W')); add('ความเร็ว', ((c._sp||0)*100).toFixed(0) + '%');
@@ -6068,6 +6089,10 @@ function warnList(){
     const R = RES.comp[c.id] || {}, n = esc(c.n || c.ref || T[c.t].nm);
     const srcI = c.t === 'src1' ? R.I : c.t === 'src3' ? Math.max(...(R.Iph||[0])) : (c.t === 'bat' || c.t === 'acs') ? R.Ir : 0;
     if (srcI > 100) w.push(['bad', `ลัดวงจร! ${n} จ่ายกระแส ${fmt(srcI, 'A')}`]);
+    if (c.t === 'mcb' && c.icu > 0){ const isc = sysIsc(); if (isc > c.icu*1000) w.push(['bad', `${n}: พิกัดตัด Icu ${c.icu} kA ต่ำกว่ากระแสลัดวงจรของระบบ ${fmt(isc, 'A')} — ลัดวงจรแล้วเบรกเกอร์อาจระเบิด เลือกรุ่น Icu สูงขึ้น`]); }
+    if ((c.t === 'src1' || c.t === 'src3') && !srcZ(c).ideal){ const R2 = RES.comp[c.id] || {}, three = c.t === 'src3', Vn = three ? c.V/SQ3 : c.V;
+      const Vt = three ? (R2.pv ? Math.min(...[0, 1, 2].map(k => rms(sub(R2.pv[k], R2.pv[3])))) : Vn) : (R2.V || Vn);
+      if ((Vn - Vt)/Vn > 0.1) w.push(['warn', `${n}: แรงดันตก ${((Vn - Vt)/Vn*100).toFixed(0)}% — หม้อแปลงเล็กเกินไปสำหรับโหลด/กระแสสตาร์ท`]); }
     if (['motor1', 'pump', 'motor3', 'motor6'].includes(c.t) && c._run){ const L = motLoad(c);
       if (L >= 2) w.push(['bad', `${n}: มอเตอร์ติด — ภาระ ${Math.round(L*100)}% เกินแรงบิดสตาร์ท (≈ 200%) หมุนไม่ขึ้น กินกระแสสตาร์ทค้าง`]);
       else if (L > 1.05) w.push(['warn', `${n}: ภาระทางกล ${Math.round(L*100)}% เกินพิกัด — กระแสเกิน In ขดลวดร้อน`]); }
@@ -8678,6 +8703,9 @@ function trendSigs(){ return trendCfg().sig.map(x => String(x || '').trim()); }
    วงจร RLC อนุกรม: vc(0) = 0, i(0) = 0 → vc = vss + e^(−αt)(A cos ωd t + B sin ωd t) · ยอด ≈ v0/√(L/C) · ใช้กับไฟ AC แบบเฟเซอร์เท่านั้น (โหมดตามเวลาจำลองเองอยู่แล้ว)
    อุปกรณ์ที่กระแสตัวเก็บประจุไหลผ่าน (สวิตช์อนุกรม, มิเตอร์, แหล่งจ่าย) ได้รูปคลื่นกระชากเดียวกันในกราฟสด */
 const INR = {Ls:20e-6, R:0.1, ev:null};
+// อิมพีแดนซ์ระบบที่ตัวเก็บประจุเห็น: หม้อแปลงของแหล่งจ่าย (srcZ) หรือค่าทั่วไป 20 µH / 0.1 Ω ถ้าแหล่งเป็นอุดมคติ · three = ตัวเก็บประจุ 1 เฟสคร่อมสาย–สายของแหล่ง 3 เฟส
+function inrSrc(types){ const o = S.comps.find(x => types.includes(x.t)); if (!o || o.t === 'acs') return {L:INR.Ls, R:INR.R};
+  const z = srcZ(o); return z.ideal ? {L:INR.Ls, R:INR.R} : {L:z.L, R:z.r, three:false}; }
 // เวลา/มุมขณะสับ: สุ่มภายใน step ล่าสุด (ไม่เกิน 1 คาบ) · INR.fix = องศาคงที่ (ทดสอบ) → เวลาสับ = ครั้งล่าสุดที่มุมนั้นผ่านมา · คืน [มุม, เวลาจำลอง]
 function inrT(w, dt){ const P = 2*Math.PI/w, span = Math.min(P, dt > 0 ? dt : P);
   if (INR.fix != null){ const th = INR.fix*Math.PI/180, back = (((w*simT - th) % (2*Math.PI)) + 2*Math.PI) % (2*Math.PI)/w; return [th, simT - back]; }
@@ -8688,7 +8716,7 @@ function capInrush(dt){
   for (const c of S.comps){ if (c.t !== 'cap') continue; const R = RES.comp[c.id]; if (!R || !R.v) continue;
     const mag = Math.hypot(R.v.r || 0, R.v.i || 0), was = c._vmag; c._vmag = mag;
     if (was === undefined || was > 1 || mag < 5 || c._blown || !Vsrc.some(v => Math.abs(mag - v) < 0.1*v)) continue;     // ต้องคร่อมไฟหลักโดยตรง
-    const C = (c.C || 0)*1e-6, L = INR.Ls + (+c.lr || 0)*1e-6, Rr = INR.R; if (!(C > 0)) continue;
+    const zs = inrSrc(['src1', 'acs', 'src3']), C = (c.C || 0)*1e-6, L = zs.L*(zs.three ? 2 : 1) + (+c.lr || 0)*1e-6, Rr = zs.R*(zs.three ? 2 : 1); if (!(C > 0)) continue;
     const al = Rr/(2*L), w0 = 1/Math.sqrt(L*C), wd = Math.sqrt(Math.max(1, w0*w0 - al*al)), [th, tEv] = inrT(w, dt);
     const vss0 = lgAt(R.v, w, th/w), iss0 = lgAt(R.i, w, th/w), A = -vss0, B = (-iss0/C + al*A)/wd;
     const itr = t => t < 0 ? 0 : C*Math.exp(-al*t)*((-al*A + wd*B)*Math.cos(wd*t) + (-al*B - wd*A)*Math.sin(wd*t));
@@ -8707,7 +8735,7 @@ function capInrush(dt){
   for (const c of S.comps){ if (c.t !== 'capbank') continue; const R = RES.comp[c.id]; if (!R || !R.vLL) continue;
     const mag = Math.hypot(R.vLL[0].r || 0, R.vLL[0].i || 0), was = c._vmag; c._vmag = mag;
     if (was === undefined || was > 1 || mag < 20 || Math.abs(mag - c.V) > 0.15*c.V) continue;
-    const C = R.Cp, L = 2*(INR.Ls + (+c.lr || 0)*1e-6), Rr = 2*INR.R, al = Rr/(2*L), w0 = 1/Math.sqrt(L*C), wd = Math.sqrt(Math.max(1, w0*w0 - al*al));
+    const zs = inrSrc(['src3']), C = R.Cp, L = 2*(zs.L + (+c.lr || 0)*1e-6), Rr = 2*zs.R, al = Rr/(2*L), w0 = 1/Math.sqrt(L*C), wd = Math.sqrt(Math.max(1, w0*w0 - al*al));
     const [th, tEv] = inrT(w, dt);
     const leg = [0, 1, 2].map(k => { const vss0 = lgAt(R.vLL[k], w, th/w), iss0 = lgAt(R.iLeg[k], w, th/w), A = -vss0, B = (-iss0/C + al*A)/wd;
       return t => t < 0 ? 0 : C*Math.exp(-al*t)*((-al*A + wd*B)*Math.cos(wd*t) + (-al*B - wd*A)*Math.sin(wd*t)); });
