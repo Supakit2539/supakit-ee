@@ -641,8 +641,11 @@ const path = require('path');
         sel = {k:'c', c:__sim.find('H1')}; lgDraw(); const a = [!$('#lgraph').hidden, /21\.\d mA/.test($('#lgval').textContent), /PF 1\.00/.test($('#lgval').textContent)];
         sel = {k:'c', c:__sim.find('M1')}; lgDraw(); a.push(/2\.55 A ×3/.test($('#lgval').textContent));
         __sim.load(__sim.EX.series.f()); sel = {k:'c', c:__sim.find('H1')}; __sim.run(1); lgDraw(); a.push(LG.h.length > 5, /250 mA/.test($('#lgval').textContent));
-        sel = null; lgDraw(); a.push($('#lgraph').hidden); return a; });
-      checks.push(['มือถือ: หัวหน้าต่างวิเคราะห์/สโคป/เทรนด์/ทดลองชุด ตัดบรรทัดได้ ปุ่ม ▶ จำลอง ฯลฯ อยู่ในจอไม่ถูก ✕ บัง · กดจำลอง/ปิดคีย์บอร์ดแล้วหน้าไม่เลื่อนค้าง แผ่นข้อมูลที่ปิดไม่โผล่ · กราฟสด: H1 21.8 mA PF 1.00, M1 2.55 A ×3, series DC ประวัติ 250 mA, ไม่เลือก = ซ่อน', Object.values(hw).every(v => v && v.every(Boolean)), JSON.stringify(hw)]); }
+        sel = null; lgDraw(); a.push($('#lgraph').hidden);
+        __sim.load(__sim.EX.dol.f()); setView('off'); sel = {k:'c', c:__sim.find('M1')}; lgDraw(); $('#lglock').click(); const st2 = __sim.find('START'); sel = {k:'c', c:st2};
+        st2._pr = true; __sim.poke(); __sim.run(0.3); st2._pr = false; __sim.poke(); __sim.run(3); lgDraw();
+        a.push(/M1/.test($('#lgname').textContent), /2\.55 A ×3/.test($('#lgval').textContent)); $('#lglock').click(); lgDraw(); a.push(!LG.lock, /START/.test($('#lgname').textContent) || $('#lgraph').hidden); return a; });
+      checks.push(['มือถือ: หัวหน้าต่างวิเคราะห์/สโคป/เทรนด์/ทดลองชุด ตัดบรรทัดได้ ปุ่ม ▶ จำลอง ฯลฯ อยู่ในจอไม่ถูก ✕ บัง · กดจำลอง/ปิดคีย์บอร์ดแล้วหน้าไม่เลื่อนค้าง แผ่นข้อมูลที่ปิดไม่โผล่ · กราฟสด: H1 21.8 mA PF 1.00, M1 2.55 A ×3, series DC ประวัติ 250 mA, ไม่เลือก = ซ่อน, 📌 ล็อก M1 แล้วกด START กราฟยังเป็น M1', Object.values(hw).every(v => v && v.every(Boolean)), JSON.stringify(hw)]); }
       const am = await mp.evaluate(() => { const xs = [], y = []; for (let k = 0; k <= 1000; k++){ xs.push(k*1e-4); y.push(325*Math.sin(2*Math.PI*50*k*1e-4)); } const m = spMeas(xs, y);
         __sim.load(__sim.EX.pfc.f()); AN.sig = null; anOpen(); const ids = [...document.querySelectorAll('#anwin .anlist label')].map(l => l.textContent.trim()); AN.pt = 'I'; anPtApply($('#anwin'));
         const vis = [...document.querySelectorAll('#anwin .anlist label')].filter(l => l.style.display !== 'none').map(l => l.textContent.trim()); AN.pt = ''; $('#anwin').hidden = true;
