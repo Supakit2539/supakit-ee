@@ -268,10 +268,10 @@ button,select,.pi,summary{touch-action:manipulation}
   @keyframes pls{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 60%,transparent)}100%{box-shadow:0 0 0 10px transparent}}
   #main{display:block;position:relative}
   #center{position:absolute;inset:0}
-  #pal,#insp{position:absolute;top:0;bottom:0;z-index:9;box-shadow:0 10px 30px rgba(0,0,0,.3);transition:transform .2s ease;overscroll-behavior:contain}
+  #pal,#insp{position:absolute;top:0;bottom:0;z-index:9;box-shadow:0 10px 30px rgba(0,0,0,.3);transition:transform .2s ease,visibility 0s linear .2s;visibility:hidden;overscroll-behavior:contain}
   #pal{left:0;width:min(300px,86vw);transform:translateX(-105%);border-right:1px solid var(--line)}
   #insp{right:0;width:min(380px,92vw);transform:translateX(105%);border-left:1px solid var(--line);padding-top:6px}
-  #main.palopen #pal,#main.inspopen #insp{transform:none}
+  #main.palopen #pal,#main.inspopen #insp{transform:none;visibility:visible;transition-delay:0s}
   .dclose{display:flex;position:sticky;top:0;z-index:2;justify-content:space-between;align-items:center;gap:8px;margin:-6px -12px 6px;padding:6px 10px;background:var(--panel);border-bottom:1px solid var(--line);font-weight:600}
   #pal .dclose{margin:-6px -8px 6px}
   #hint{font-size:11px;max-width:calc(100% - 20px)}
@@ -9188,7 +9188,7 @@ function kbarAttach(ta){
     else ta.setRangeText(k, a, ta.selectionEnd, 'end');
     ta.dispatchEvent(new Event('input')); };
 }
-function drawer(w){ const m = $('#main'); m.classList.toggle('palopen', w === 'pal'); m.classList.toggle('inspopen', w === 'insp'); }
+function drawer(w){ const m = $('#main'); if (window.scrollY) window.scrollTo(0, 0); m.classList.toggle('palopen', w === 'pal'); m.classList.toggle('inspopen', w === 'insp'); }
 function refreshUI(){ renderInsp(); liveUI(); if (ladOpen) ladStruct(); $('#bUndo').disabled = !hist.length; $('#bRedo').disabled = !fut.length; $('#bVal').classList.toggle('on', showVal); }
 function onLoaded(){ if (scopeWin && !S.comps.some(c => c.id === scopeWin)) scopeWin = null; setTimeout(scopeUI, 0); fx.hv++; fx.sel = null; fxFrame(); ladSel = {ri:0, row:0, col:0}; if (!S.comps.some(c => c.id === ladPid)) ladPid = null; }
 function fit(){
@@ -9421,7 +9421,10 @@ $('#bPal').onclick = () => drawer($('#main').classList.contains('palopen') ? nul
 $('#bInsp').onclick = () => drawer($('#main').classList.contains('inspopen') ? null : 'insp');
 document.addEventListener('click', e => { const b = e.target.closest('[data-dclose]'); if (b) drawer(null); });
 // หน้าเว็บทั้งหน้าไม่ควรเลื่อน (body overflow:hidden) — ถ้ามีอะไรเลื่อน html/body (เช่น scrollIntoView, คีย์บอร์ดมือถือ) ดึงกลับ
-window.addEventListener('scroll', () => { if (window.scrollY && !document.activeElement?.matches?.('input,textarea,select')) window.scrollTo(0, 0); });
+const unscroll = () => { if (window.scrollY && !document.activeElement?.matches?.('input,textarea,select')) window.scrollTo(0, 0); };
+window.addEventListener('scroll', unscroll);
+document.addEventListener('focusout', () => setTimeout(unscroll, 350));                 // คีย์บอร์ดมือถือปิด → หน้าที่ถูกดันขึ้นกลับที่เดิม
+if (window.visualViewport) visualViewport.addEventListener('resize', () => setTimeout(unscroll, 100));
 // ปิดลิ้นชักตอนยกนิ้วด้วย: บางเครื่อง (Android) ไม่ส่ง click เมื่อแผ่นข้อมูลยังเลื่อน/อัปเดตอยู่
 document.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse' && e.target.closest('[data-dclose]')) drawer(null); });
 $('#bAn').onclick = () => { const w = $('#anwin'); if (w.hidden) anOpen(); else w.hidden = true; };
