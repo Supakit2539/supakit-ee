@@ -319,12 +319,15 @@ button,select,.pi,summary{touch-action:manipulation}
   #kbar::-webkit-scrollbar{display:none}
   #kbar button{flex:none;min-width:38px;min-height:36px;font:600 16px 'IBM Plex Mono',monospace;padding:0 8px}
   /* หน้าต่างลอย: หัวติดด้านบน ปุ่มเลื่อนแนวนอน */
-  #scopewin .swh,#anwin .swh,#trwin .swh,#exwin .swh{position:sticky;top:0;z-index:3;background:var(--panel);flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;cursor:default;flex:none;min-height:54px;padding:6px 8px}
-  .swh::-webkit-scrollbar{display:none}
+  /* หัวหน้าต่างลอย: ตัดขึ้นบรรทัดใหม่ (ปุ่มหลักต้องเห็นเสมอ) ✕ ตรึงมุมขวาบน */
+  #scopewin .swh,#anwin .swh,#trwin .swh,#exwin .swh{position:sticky;top:0;z-index:3;background:var(--panel);flex-wrap:wrap;row-gap:6px;overflow:visible;cursor:default;flex:none;min-height:54px;padding:6px 54px 6px 8px}
   .swh .anhint{display:none}
   .swh>*{flex:none}
-  .swh [data-tb="x"],.swh [data-eb="x"],.swh [data-sa="close"],.swh [data-aa="close"]{position:sticky;right:0;z-index:2;box-shadow:-12px 0 10px var(--panel)}
-  .swh>b{font-size:14px}
+  .swh>span[style*="flex:1"]{display:none}
+  .swh>select{flex:1 1 150px;min-width:0}
+  .swh [data-tb="x"],.swh [data-eb="x"],.swh [data-sa="close"],.swh [data-aa="close"]{position:absolute;right:6px;top:6px;z-index:2}
+  .swh>b{font-size:14px;width:100%;line-height:1.2}
+  .anplot{scroll-margin-top:120px}
   #ftools{gap:3px;padding:4px;width:calc(100% - 16px);max-width:440px;justify-content:space-between}
   #ftools .btn{min-width:0;flex:1 1 0;padding:4px 2px;font-size:12px}
   #insp{top:auto;left:0;right:0;width:auto;height:58%;transform:translateY(105%);border-left:0;border-top:1px solid var(--line);border-radius:14px 14px 0 0;padding-bottom:calc(20px + env(safe-area-inset-bottom))}
@@ -8469,7 +8472,7 @@ async function anSave(name, data, type){
   const el = $('#anwin');
   el.addEventListener('click', e => { const b = e.target.closest('[data-aa]'); if (!b) return; const a = b.dataset.aa;
     if (a === 'close') el.hidden = true;
-    if (a === 'run') anRun();
+    if (a === 'run'){ anRun(); if (phone()){ const pl = el.querySelector('.anplot'); if (pl) pl.scrollIntoView({block:'start', behavior:'smooth'}); } }
     if (a === 'csv'){ const t = anCSV(); if (!t) return; clipWrite(t); anSave('circuit-lab-' + AN.kind + '.csv', '\ufeff' + t, 'text/csv'); }
     if (a === 'png'){ const c2 = $('#anv'); if (c2) anSave('circuit-lab-' + AN.kind + '.png', c2.toDataURL('image/png')); }
     if (a === 'net'){ const box = $('#annet'), t = spNetlist(); box.hidden = !box.hidden;

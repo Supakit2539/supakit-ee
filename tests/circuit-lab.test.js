@@ -618,6 +618,14 @@ const path = require('path');
     await mp.tap('#fhud [data-f="hmin"]'); m2.hud.push(await mp.evaluate(() => !document.querySelector('#fhud .fcard').classList.contains('min'))); await mp.evaluate(() => setView('off'));
     checks.push(['มือถือ: ส่วนหัวเหลือ 4 ปุ่มไม่ล้นจอ, เมนู ⋯ แผ่นล่างสั่งเปิดตัวเขียนโปรแกรมเต็มจอ, ไม่เปิดเทรนด์เอง, ตัวอย่างไม่มีฉากปิด 3D, แถวสัญลักษณ์แทรก ( ) และ ; · ตัวอย่างมีฉากไม่แบ่งจอเอง, ฉากที่ไม่ผูกอุปกรณ์มีปุ่มลบ, ตัวอักษรบนแผงขยายเมื่อซูมออก · แผง 3D ย่อเป็นแถบ แตะ START ครั้งเดียวสายพานวิ่ง · ฉาก 3D ถ่างสองนิ้วซูมเข้า (ไม่หมุน) ปุ่ม − ซูมออก',
       m2.auto[0] && m2.auto[1] && m2.auto[2] === 4 && m2.sheet >= 14 && m2.lad.every(Boolean) && m2.off3d === 'off' && m2.kb === '(;)' && m2.ph3d[0] === 'off' && m2.ph3d[1] && m2.ph3d[2] === 16.2 && m2.drop[0] === 'off' && !m2.drop[1] && m2.hud[0] && m2.hud[1] < 60 && m2.hud[2] && m2.hud[3] && m2.z3d.every(Boolean), JSON.stringify(m2)]);
+    { // หัวหน้าต่างลอยบนโทรศัพท์: ปุ่มหลักทุกปุ่มอยู่ในจอ (ไม่ถูกซ่อนหลัง ✕ หรือเลื่อนออกนอกจอ)
+      const hw = {}; await mp.evaluate(() => { __sim.load(__sim.EX.osc.f()); });
+      for (const [btn, w] of [['#bAn', '#anwin'], ['#bScope', '#scopewin'], ['#bTrend', '#trwin'], ['#bExp', '#exwin']]){
+        hw[w] = await mp.evaluate(([btn, w]) => { document.querySelectorAll('#anwin,#scopewin,#trwin,#exwin').forEach(e => e.hidden = true); if (w === '#scopewin') scopeOpen(__sim.S.comps.find(c => c.t === 'scope')); else { const B = document.querySelector(btn); if (B) B.click(); }
+          const el = document.querySelector(w); if (!el || el.hidden) return null; const W = innerWidth, x = el.querySelector('.swh [data-aa="close"],.swh [data-sa="close"],.swh [data-tb="x"],.swh [data-eb="x"]'), xr = x && x.getBoundingClientRect();
+          const bs = [...el.querySelectorAll('.swh>button,.swh>select')].filter(b => b.offsetParent && b !== x);
+          const r = [el.querySelector('.swh').offsetHeight >= 50, bs.every(b => { const q = b.getBoundingClientRect(); return q.left >= 0 && q.right <= W + 1 && !(xr && q.right > xr.left && q.top < xr.bottom && q.bottom > xr.top); })]; el.hidden = true; return r; }, [btn, w]); }
+      checks.push(['มือถือ: หัวหน้าต่างวิเคราะห์/สโคป/เทรนด์/ทดลองชุด ตัดบรรทัดได้ ปุ่ม ▶ จำลอง ฯลฯ อยู่ในจอไม่ถูก ✕ บัง', Object.values(hw).every(v => v && v.every(Boolean)), JSON.stringify(hw)]); }
     await mctx.close(); }
   const ed = await page.evaluate(async () => { const s = __sim, o = {};
     // เลือกหลายชิ้น + คัดลอก/วาง + ย้อนกลับ/ทำซ้ำ + ย้ายทั้งชุด
