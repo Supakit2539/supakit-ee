@@ -625,6 +625,8 @@ const path = require('path');
           const el = document.querySelector(w); if (!el || el.hidden) return null; const W = innerWidth, x = el.querySelector('.swh [data-aa="close"],.swh [data-sa="close"],.swh [data-tb="x"],.swh [data-eb="x"]'), xr = x && x.getBoundingClientRect();
           const bs = [...el.querySelectorAll('.swh>button,.swh>select')].filter(b => b.offsetParent && b !== x);
           const r = [el.querySelector('.swh').offsetHeight >= 50, bs.every(b => { const q = b.getBoundingClientRect(); return q.left >= 0 && q.right <= W + 1 && !(xr && q.right > xr.left && q.top < xr.bottom && q.bottom > xr.top); })]; el.hidden = true; return r; }, [btn, w]); }
+      await mp.evaluate(() => { __sim.load(__sim.EX.pfc.f()); anOpen(); AN.kind = 'tran'; anUI(); }); await mp.tap('#anwin [data-aa="run"]'); await mp.waitForTimeout(1200);
+      hw.scroll = await mp.evaluate(() => { const r = [document.scrollingElement.scrollTop === 0, document.querySelector('header').getBoundingClientRect().top === 0, $('#anwin').scrollTop > 50]; $('#anwin').hidden = true; return r; });
       checks.push(['มือถือ: หัวหน้าต่างวิเคราะห์/สโคป/เทรนด์/ทดลองชุด ตัดบรรทัดได้ ปุ่ม ▶ จำลอง ฯลฯ อยู่ในจอไม่ถูก ✕ บัง', Object.values(hw).every(v => v && v.every(Boolean)), JSON.stringify(hw)]); }
       const am = await mp.evaluate(() => { const xs = [], y = []; for (let k = 0; k <= 1000; k++){ xs.push(k*1e-4); y.push(325*Math.sin(2*Math.PI*50*k*1e-4)); } const m = spMeas(xs, y);
         __sim.load(__sim.EX.pfc.f()); AN.sig = null; anOpen(); const ids = [...document.querySelectorAll('#anwin .anlist label')].map(l => l.textContent.trim()); AN.pt = 'I'; anPtApply($('#anwin'));

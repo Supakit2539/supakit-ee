@@ -328,7 +328,6 @@ button,select,.pi,summary{touch-action:manipulation}
   .swh>select{flex:1 1 150px;min-width:0}
   .swh [data-tb="x"],.swh [data-eb="x"],.swh [data-sa="close"],.swh [data-aa="close"]{position:absolute;right:6px;top:6px;z-index:2}
   .swh>b{font-size:14px;width:100%;line-height:1.2}
-  .anplot{scroll-margin-top:120px}
   #ftools{gap:3px;padding:4px;width:calc(100% - 16px);max-width:440px;justify-content:space-between}
   #ftools .btn{min-width:0;flex:1 1 0;padding:4px 2px;font-size:12px}
   #insp{top:auto;left:0;right:0;width:auto;height:58%;transform:translateY(105%);border-left:0;border-top:1px solid var(--line);border-radius:14px 14px 0 0;padding-bottom:calc(20px + env(safe-area-inset-bottom))}
@@ -8505,7 +8504,7 @@ async function anSave(name, data, type){
   el.addEventListener('click', e => { const b = e.target.closest('[data-aa]'); if (!b) return; const a = b.dataset.aa;
     if (a === 'close') el.hidden = true;
     if (a.startsWith('pt:')){ AN.pt = a.slice(3); el.querySelectorAll('[data-aa^="pt:"]').forEach(x => x.classList.toggle('on', x === b)); anPtApply(el); return; }
-    if (a === 'run'){ anRun(); if (phone()){ const pl = el.querySelector('.anplot'); if (pl) pl.scrollIntoView({block:'start', behavior:'smooth'}); } }
+    if (a === 'run'){ anRun(); if (phone()){ const pl = el.querySelector('.anplot'); if (pl){ const hh = el.querySelector('.swh').offsetHeight; el.scrollTo({top:pl.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - hh - 6, behavior:'smooth'}); } } }
     if (a === 'csv'){ const t = anCSV(); if (!t) return; clipWrite(t); anSave('circuit-lab-' + AN.kind + '.csv', '\ufeff' + t, 'text/csv'); }
     if (a === 'png'){ const c2 = $('#anv'); if (c2) anSave('circuit-lab-' + AN.kind + '.png', c2.toDataURL('image/png')); }
     if (a === 'net'){ const box = $('#annet'), t = spNetlist(); box.hidden = !box.hidden;
@@ -9421,6 +9420,8 @@ $('#ftools').onclick = e => { const b = e.target.closest('[data-px]'); if (b) $(
 $('#bPal').onclick = () => drawer($('#main').classList.contains('palopen') ? null : 'pal');
 $('#bInsp').onclick = () => drawer($('#main').classList.contains('inspopen') ? null : 'insp');
 document.addEventListener('click', e => { const b = e.target.closest('[data-dclose]'); if (b) drawer(null); });
+// หน้าเว็บทั้งหน้าไม่ควรเลื่อน (body overflow:hidden) — ถ้ามีอะไรเลื่อน html/body (เช่น scrollIntoView, คีย์บอร์ดมือถือ) ดึงกลับ
+window.addEventListener('scroll', () => { if (window.scrollY && !document.activeElement?.matches?.('input,textarea,select')) window.scrollTo(0, 0); });
 // ปิดลิ้นชักตอนยกนิ้วด้วย: บางเครื่อง (Android) ไม่ส่ง click เมื่อแผ่นข้อมูลยังเลื่อน/อัปเดตอยู่
 document.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse' && e.target.closest('[data-dclose]')) drawer(null); });
 $('#bAn').onclick = () => { const w = $('#anwin'); if (w.hidden) anOpen(); else w.hidden = true; };
