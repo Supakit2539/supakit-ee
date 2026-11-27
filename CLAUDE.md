@@ -94,6 +94,11 @@ PLC (แลดเดอร์ + ข้อความ), HMI ผ่าน RS-485,
    - **ตัวควบคุม PF อัตโนมัติ** `pfcr` (L C / N Q1–Q4; `meas` ชื่อแหล่งจ่าย/มิเตอร์, `pft`, `steps` kvar 4 สเต็ป, `delay`, `dis` เวลาคายประจุ, `auto`): `pfcTick` ต้น `discrete`
      อ่าน P/Q (`pfcPQ`, บวก = จ่ายให้โหลด) → เลือกชุดสเต็ปจาก 16 แบบ (ต่ำกว่าเป้าเสียตามที่ขาด, นำหน้าเสีย 2 เท่า, +0.05 ต่อสเต็ปที่เปลี่ยน) ต้องต้องการต่อเนื่อง `delay` s → เปลี่ยนทีละสเต็ป (สับก่อนปลด)
      หน้าสัมผัส C–Qk ใน stamp (`c._st`, ต้องมีไฟเลี้ยง `c._pw` ≥ 180 V) · ตัวอย่าง `pfcauto` (หม้อแปลง 160 kVA, มอเตอร์ 3 ตัว, แบงก์ 2.5/5/5/10 kvar ผ่าน K1–K4, M3 ผ่าน K10/S1)
+   - **ฮาร์มอนิก** (`harmSolve(nn, w)` ท้าย `solveAll` เมื่อมีโหลดไม่เชิงเส้น): `nl1` (2 ขั้ว, `kind` smps/led/apfc; ฮาร์มอนิกหลักเป็น R = V²/P ใน `admit`), `nl3` (บล็อก L1–L3 แบบ capbank, `kind` 6p/6pdc/afe, R เดลต้า)
+     สเปกตรัม `HSPEC` · แหล่งกระแสลำดับ h เฟส = π/2 − h(π/2 − φ1) (6 พัลส์ h = 6k−1 กลับเครื่องหมาย) · วงจรต่อลำดับ: แหล่งจ่าย R + jhX (`srcZ`), C ×h, โหลดเหนี่ยวนำ X×h, มอเตอร์ = รีแอกแตนซ์ล็อกโรเตอร์ ×h,
+     capbank + ดีจูน `det` % (Z = j(hp − 1/h)Xc), k3/ol/pmeter/rcd ปิด = สาย · ผล `R.hv`/`R.hi` = [คู่][[h, re, im]] (RMS), `RES.harm.V[h]` แรงดันโหนด
+     → `lgPairs` แนบ `hh` (กราฟสด/`lgAt` รวมฮาร์มอนิก, ป้าย THDi/THDv), สโคป (`scopeProbe` → `ch.hh`, FFT `syn`), แผงขวา (THD, สเปกตรัม, `harmRes()` h = √(Ssc/Qc)), `warnList` (THDv > 8%, คาปาซิเตอร์ THDi > 30%)
+     · ตัวอย่าง `harmonic` (160 kVA, ไดรฟ์ 60 kW, มอเตอร์ 30 kW, แบงก์ 80 + 80 kvar ผ่าน S1/S2) · คำเตือนลัดวงจรของแหล่งที่มีหม้อแปลง = เกิน 2 เท่าพิกัด
    - วนแก้ซ้ำสำหรับสถานะพีชคณิต: LED on/off/เสีย, รอยต่อ PN (`JUNC`), BJT, MOSFET, 78xx, ออปโต, หลอดขาด, คอยล์ไหม้, PSU on/โหลดเกิน, ทรานสมิตเตอร์ 4–20 mA
    - ผลลัพธ์อยู่ใน `RES.comp[id]` (`v`,`i` = {d,r,i}, `Vr`,`Ir` = RMS, `P`,`Q`, `ac`; บล็อกมีฟิลด์เฉพาะ เช่น `ph`, `Iph`, `pw`, `inp`),
      `RES.wire`, `RES.src`, `RES.nvv` (แรงดันโหนด), `RES.net` (เส้นสายที่ต่อถึงกันด้วยสายไฟล้วน ใช้ตรวจ RS-485)
@@ -162,7 +167,7 @@ PLC (แลดเดอร์ + ข้อความ), HMI ผ่าน RS-485,
    - ลูปหลัก `frame()` แบ่งเวลาเป็นช่วงละ ≤ 0.05 s ตามความเร็วจำลองที่เลือก
 6. **State/ประวัติ** — `ser()`, `load()`, `commit()`, `pushHist()`, `undo()`; บันทึกลง localStorage คีย์ `circuit-board-v2`
    ฟิลด์ที่ขึ้นต้นด้วย `_` เป็นสถานะรันไทม์ ไม่ถูกบันทึก
-7. **ตัวอย่าง** — `EX` (series, parallel, mixed, led, home, dol, plcpump, arduino, esp32, pico, ardsense, espgarden, plcsense, indsense, rs485, lora, rs232, modbus, plc2port, hmimodbus, modbustcp, esp32wifi, lcdi2c, rectifier, halfwave, rccharge, logic, flipflop, opamp, opamposc, chaser, cnt7seg, shift595, lm317, tempalarm, ceamp, semi, timer555, pidtank, counter, motor, stardelta, rcdtest, pfc, pfcauto, stair, factory, seqconv, gate, pickplace, lift, elevator, osc, oscxy, oscprobe, blank) — dol/stardelta/plcpump/pico มีฉาก 3D ผูกมาด้วย สร้างด้วย `build((C,W)=>…)`
+7. **ตัวอย่าง** — `EX` (series, parallel, mixed, led, home, dol, plcpump, arduino, esp32, pico, ardsense, espgarden, plcsense, indsense, rs485, lora, rs232, modbus, plc2port, hmimodbus, modbustcp, esp32wifi, lcdi2c, rectifier, halfwave, rccharge, logic, flipflop, opamp, opamposc, chaser, cnt7seg, shift595, lm317, tempalarm, ceamp, semi, timer555, pidtank, counter, motor, stardelta, rcdtest, pfc, pfcauto, harmonic, stair, factory, seqconv, gate, pickplace, lift, elevator, osc, oscxy, oscprobe, blank) — dol/stardelta/plcpump/pico มีฉาก 3D ผูกมาด้วย สร้างด้วย `build((C,W)=>…)`
 8. **การวาด** — canvas, `drawTwo()` (อุปกรณ์ 2 ขั้ว, วาดในพิกัดท้องถิ่นที่หมุนแล้ว), `drawBlock()`, `labelTwo()`, `drawFlow()` (จุดกระแส: DC ไหลทางเดียว, AC แกว่งตามมุมเฟส)
    - สีสาย: L1 น้ำตาล, L2 ดำ, L3 เทา (ตามมุมเฟส), N/สายกลับฟ้า, DC + แดง
 9. **แผงขวา (inspector)** — `F` = สเปกฟิลด์ของแต่ละชนิด, `NOTES`, `compHTML()`, `warnList()`
@@ -357,6 +362,7 @@ NODE_PATH=$(npm root -g) node tests/circuit-lab.test.js
 - กระแสกระชากสับ C1 (pfc): ที่ 90° ≈ 490 A (≈ 70×) สั่น ≈ 4.6 kHz, ที่ 0° ≈ 11 A, รีแอกเตอร์ 200 µH ≈ 160 A · เส้นทาง C1/S1/PM1/การไฟฟ้า · capbank 10 kvar 400 V ที่ 90° ≈ 1 kA 3 kHz, lr 100 µH ลดกว่าครึ่ง
 - หม้อแปลงจ่ายไฟ: 160 kVA 4% → Isc 5774 A; 500 kVA → เตือน MCB Icu 6 kA; 5 kVA dol สตาร์ท 212.9 V เดิน 228.3 V; pfc + thhome → กระชาก C1 128 A 1.08 kHz
 - pfcauto: PF 0.823 → ≥ 0.95 ใน 8 s, สับ S1 (M3) → ปรับจน ≥ 0.95 ไม่นำหน้า, กระชาก > 100 A, ไม่มีคำเตือน
+- harmonic: ไดรฟ์ THDi 74.3%, THDv ≈ 5.8% → สับ 160 kvar เรโซแนนซ์ h = 5.00 THDv ≈ 30% + เตือน → ดีจูน 7% THDv ≈ 3% · SMPS 1 เฟส THDi ≈ 110%
 - ภาระทางกล: pfc M1 0/50/100/150% → 3.15 A PF 0.18 / PF 0.55 / 7.16 A PF 0.65 1440 rpm / 11.1 A PF 0.66 · dol 220% → มอเตอร์ติด เบรกเกอร์ตัด
 - stardelta: สตาร์ท ≈ 34 A, สตาร์ ≈ 4.8 A, หลัง 5 s เดลต้า ≈ 14.3 A, เฟสขาด → คราง + อุปกรณ์ป้องกันตัด, E-Stop → K1 หลุด
 - factory: กด START → สายพานวิ่ง; ผ่านไป 60 s `FXS.cnt` = โลหะ ≥ 5, ชิ้นงานอื่น ≥ 5, `miss` = 0, `wrong` = 0; กด STOP → สายพานหยุด
@@ -393,6 +399,7 @@ NODE_PATH=$(npm root -g) node tests/circuit-lab.test.js
 - บล็อกหมุนได้ (ตอนนี้หมุนได้เฉพาะอุปกรณ์ 2 ขั้ว), หมุนชุดที่เลือกหลายชิ้น
 - ลอจิกแอนะไลเซอร์, สลับภาษา TH/EN, รายงาน PDF, แบบฝึกหัดเพิ่ม (PLC/MCU)
 - โรงงาน 3D: เครื่องจักรเพิ่ม (โต๊ะหมุน, แขนปัด, สายพานโค้ง), กล่องเอียงตามทางลาด, แขนหยิบวางต่างระดับ, เงาบนชิ้นงาน (shadow map), ตัวนับ (CTU) ใน PLC, เซนเซอร์แอนะล็อกในฉาก
+- ฮาร์มอนิก: หม้อแปลง/สายในโหมดตามเวลา, ฟิลเตอร์แอกทีฟ, ไดรฟ์ 12 พัลส์, ลำดับ 3 ใน N (4 สาย)
 - ออสซิลโลสโคป: FFT แบบ dB/Vrms สลับได้และหน้าต่างอื่น, สวิตชิ่งเร็วในโหมดเลื่อน, ตัวถอดรหัส I2C/SPI (ยังไม่มีอุปกรณ์ I2C/SPI), อินเวอร์เตอร์, โพรบดิฟเฟอเรนเชียล, กระแสขดลวดในโหมดตามเวลา
 - โหมดตามเวลา: ขยายให้ครอบคลุมทรานซิสเตอร์/MOSFET/78xx/NE555/MCU PWM, 3 เฟส, ความเหนี่ยวนำแม่เหล็กหม้อแปลง
 - MOSFET/ทรานซิสเตอร์รับ PWM แบบเฉลี่ย (ตอนนี้ PWM ที่เกตถือว่าเปิดเต็ม), สลูว์เรตออปแอมป์, เกต 3–4 อินพุต, ไอซีเพิ่ม (ULN2003, 74HC138, L293D, LCD I2C), ขา PRE/CLR ของ D-FF

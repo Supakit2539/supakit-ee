@@ -323,6 +323,13 @@ const path = require('path');
     // ตู้ PFC อัตโนมัติ: PF 0.82 → ≥ 0.95 ภายใน 8 s, สตาร์ท M3 (S1) → กลับมา ≥ 0.95, ไม่นำหน้า, มีกระแสกระชากตอนสับสเต็ป, ไม่มีคำเตือน
     { s.load('pfcauto'); s.run(2.2); const p = s.find('PFC1'), pf0 = p._pf; s.run(7); const pf1 = p._pf, st1 = p._st.map(x => x ? 1 : 0).join('');
       s.find('S1').on = true; s.solveNow(); s.run(12); o.pfa = [+pf0.toFixed(3), +pf1.toFixed(3), st1, +p._pf.toFixed(3), p._q > 0, s.S.comps.some(c => c.t === 'capbank' && c._inr && c._inr.pk > 100), warnList().length]; }
+    // ฮาร์มอนิก: ไดรฟ์ 6 พัลส์ THDi ≈ 74%, THDv ≈ 6% · สับคาปาซิเตอร์ 160 kvar → เรโซแนนซ์ h = 5 THDv > 20% + เตือน · ดีจูน 7% → THDv < 5% · SMPS 1 เฟส THDi ≈ 110% · สโคปเห็นแรงดันผิดรูป
+    { s.load('harmonic'); s.run(2); const g = s.find('การไฟฟ้า'), th = c => { const pr = lgPairs(c); return [+thdOf(pr[0][0], pr[0][0].hh).toFixed(1), +thdOf(pr[0][1], pr[0][1].hh).toFixed(1)]; };
+      o.hm = [th(s.find('VFD1'))[1], th(g)[0]]; s.find('S1').on = true; s.find('S2').on = true; s.solveNow(); s.run(1);
+      o.hm.push(th(g)[0], +harmRes().h.toFixed(2), warnList().some(x => /THDv/.test(x[1])) && warnList().some(x => /เรโซแนนซ์/.test(x[1])));
+      s.find('CB1').det = '7'; s.find('CB2').det = '7'; s.solveNow(); s.run(0.5); o.hm.push(th(g)[0]);
+      s.load(build((C, W) => { C('src1', 2, 1, {n:'G1'}); C('nl1', 2, 5, {r:1, n:'PC1', P:300, kind:'smps'}); W([2,2],[2,4]); W([3,2],[3,6],[2,6]); }));
+      o.hm.push(th(s.find('PC1'))[1]); }
     s.load('arduino'); s.run(1.2); o.pwmSw = scopeSwitchers().map(x => [x.f, Math.round(x.duty*100)/100]);
 
     o.mcuErr = ['arduino','esp32','pico','ardsense','espgarden','counter','motor'].map(k => (s.load(k), s.run(0.3), s.find('U1')._vm.err)).filter(Boolean);
@@ -348,6 +355,8 @@ const path = require('path');
     Math.abs(r.tz[0][0] - 5774) < 30 && !r.tz[0][1] && r.tz[1][1] && r.tz[2][0] < r.tz[2][1] - 2 && r.tz[3][0] > 80 && r.tz[3][0] < 250 && r.tz[3][1] > 700 && r.tz[3][1] < 1500, JSON.stringify(r.tz)]);
   checks.push(['ตู้ PFC อัตโนมัติ (pfcauto): PF 0.82 → ≥ 0.95, สตาร์ท M3 แล้วปรับสเต็ปจน ≥ 0.95 ไม่นำหน้า, มีกระแสกระชาก > 100 A ตอนสับ, ไม่มีคำเตือน',
     Math.abs(r.pfa[0] - 0.823) < 0.01 && r.pfa[1] >= 0.95 && r.pfa[3] >= 0.95 && r.pfa[4] && r.pfa[5] && r.pfa[6] === 0, JSON.stringify(r.pfa)]);
+  checks.push(['ฮาร์มอนิก: ไดรฟ์ 6 พัลส์ THDi ≈ 74%, THDv ≈ 6% → สับคาปาซิเตอร์ 160 kvar เรโซแนนซ์ h = 5 THDv > 20% + เตือน → ดีจูน 7% THDv < 5% · SMPS THDi ≈ 110%',
+    Math.abs(r.hm[0] - 74.3) < 1 && r.hm[1] > 4 && r.hm[1] < 8 && r.hm[2] > 20 && r.hm[3] === 5 && r.hm[4] && r.hm[5] < 5 && Math.abs(r.hm[6] - 110) < 3, JSON.stringify(r.hm)]);
   checks.push(['dol: K1 ดูด', r.dolCoil === true, r.dolCoil]);
   near('dol: กระแสสตาร์ท ≈ 6 × In (15.3 A)', r.dolInrush, 15.3, 0.2);
   for (let k = 0; k < 3; k++) near('dol: กระแสเฟส ' + (k + 1) + ' หลังเร่งเครื่อง 2.55 A', r.dolI[k], 2.55, 0.02);

@@ -421,7 +421,7 @@ button,select,.pi,summary{touch-action:manipulation}
 <script>
 'use strict';
 // รุ่นของแอป (เพิ่มทุกครั้งที่ปล่อยของใหม่) — แสดงท้ายเมนู ⋯ และเมนูไฟล์ เพื่อเช็กว่าโทรศัพท์โหลดรุ่นล่าสุดแล้ว
-const APP_VER = '2026.11.28-3';
+const APP_VER = '2026.11.28-4';
 /* ============================================================
    1. ค่าคงที่และชนิดอุปกรณ์
    ============================================================ */
@@ -794,6 +794,8 @@ T.motor6 = {nm:'มอเตอร์ 3 เฟส 6 ขั้ว (สตาร�
             pins:[[-1,-1,'U1'],[0,-1,'V1'],[1,-1,'W1'],[-1,1,'U2'],[0,1,'V2'],[1,1,'W2']], box:[-1.6,-1,1.6,1]};
 T.cable  = {nm:'สายไฟ (ตามขนาด mm²)',          ic:'═', pre:'W', d:{A:2.5, len:20, mat:'Cu'}};
 T.capbank= {nm:'คาปาซิเตอร์แบงก์ 3 เฟส',        ic:'⫴', pre:'C', d:{kvar:5, V:400}, pins:[[-1,-1,'L1'],[0,-1,'L2'],[1,-1,'L3']], box:[-1.6,-1,1.6,1]};
+T.nl1 = {nm:'โหลดไม่เชิงเส้น 1 เฟส (SMPS/LED)', ic:'≋', pre:'NL', d:{V:230, P:500, kind:'smps'}};
+T.nl3 = {nm:'โหลดไม่เชิงเส้น 3 เฟส (ไดรฟ์/เรกทิฟายเออร์)', ic:'≋3', pre:'NL', d:{V:400, P:30, kind:'6p'}, pins:[[-1,-1,'L1'],[0,-1,'L2'],[1,-1,'L3']], box:[-1.6,-1,1.6,1]};
 T.pfcr = {nm:'ตัวควบคุม PF อัตโนมัติ', ic:'PF', pre:'PFC', d:{meas:'การไฟฟ้า', pft:0.95, steps:'2.5,5,5,10', delay:3, dis:10, auto:true},
   pins:[[-2,-1,'L'],[2,-1,'C'],[-2,1,'N'],[-1,1,'Q1'],[0,1,'Q2'],[1,1,'Q3'],[2,1,'Q4']], box:[-2.6,-1,2.6,1]};
 T.scope  = {nm:'ออสซิลโลสโคป 2 แชนเนล',       ic:'∿', pre:'OSC', d:{vdiv1:5, vdiv2:5, tdiv:0.005, pos1:1.5, pos2:-2.5, cpl1:'DC', cpl2:'DC', on2:true, trig:'1', slope:'up', tlev:0, earth:true, run:true, disp:'yt', fftch:'1', fspan:'auto', fref:30,
@@ -1316,6 +1318,7 @@ function admit(c, isAC, w){
   switch (c.t){
     case 'res':   return [c._blown ? GOFF : 1/Math.max(c.R, 1e-3), 0];
     case 'lamp':  return [c._blown ? GOFF : c.P/(c.V*c.V), 0];
+    case 'nl1':   return [c.P/(c.V*c.V), 0];                                  // ฮาร์มอนิกหลัก: เหมือนตัวต้านทาน (ฮาร์มอนิกอื่นจาก harmSolve)
     case 'sw':    return [c.on ? GW : GOFF, 0];
     case 'pb':    return [c._pr ? GW : GOFF, 0];
     case 'pbnc':  return [c._pr ? GOFF : GW, 0];
@@ -1503,6 +1506,7 @@ function solveAll(){
         case 'swint': { const x = c.pos === 'X'; Y(n[0], n[x ? 3 : 2], GW, 0); Y(n[1], n[x ? 2 : 3], GW, 0); Y(n[0], n[x ? 2 : 3], GOFF, 0); Y(n[1], n[x ? 3 : 2], GOFF, 0); } break;
         case 'sel3': Y(n[0], n[1], c.pos === '1' ? GW : GOFF, 0); Y(n[0], n[2], c.pos === '2' ? GW : GOFF, 0); break;
         case 'ol': for (let k = 0; k < 3; k++) Y(n[k], n[k + 3], GW, 0); Y(n[6], n[7], c._trip ? GOFF : GW, 0); break;
+        case 'nl3': if (ac){ const G = c.P*1000/(3*c.V*c.V); for (let k = 0; k < 3; k++) Y(n[k], n[(k + 1)%3], G, 0); } break;
         case 'capbank': if (ac){ const Cp = c.kvar*1000/3/(w*c.V*c.V); for (let k = 0; k < 3; k++) Y(n[k], n[(k + 1)%3], 0, w*Cp); } break;
         case 'gnd': Y(n[0], 0, GW, 0); break;
         case 'vfd': {
@@ -1710,6 +1714,8 @@ function solveAll(){
           if (c.t === 'rcd' && !c.on) R.I = R.idiff = 0;
         } break;
         case 'ol': R.Ip = [0,1,2].map(k => GW*rms(sub(R.pv[k], R.pv[k + 3]))); break;
+        case 'nl3': { const G = c.P*1000/(3*c.V*c.V); R.vLL = [0, 1, 2].map(k => sub(R.pv[k], R.pv[(k + 1)%3])); R.iLeg = R.vLL.map(v => ({d:0, r:G*(v.r || 0), i:G*(v.i || 0)}));
+          R.iL = [0, 1, 2].map(k => sub(R.iLeg[k], R.iLeg[(k + 2)%3])); R.P = R.vLL.reduce((a, v) => a + G*acm(v)**2, 0); R.Q = 0; R.I = rms(R.iL[0]); } break;
         case 'capbank': { const Cp = c.kvar*1000/3/(w*c.V*c.V); let Q = 0; R.Il = []; R.Cp = Cp;
           R.vLL = [0, 1, 2].map(k => sub(R.pv[k], R.pv[(k + 1)%3])); R.iLeg = R.vLL.map(v => ({d:0, r:-w*Cp*(v.i || 0), i:w*Cp*(v.r || 0)}));   // i = jωC·v
           R.iL = [0, 1, 2].map(k => sub(R.iLeg[k], R.iLeg[(k + 2)%3]));
@@ -1795,6 +1801,7 @@ function solveAll(){
   for (const wr of S.wires) par[find(wr._a)] = find(wr._b);
   for (const [a, b] of lblPairs(c => c._n[0])) par[find(a)] = find(b);
   RES.net = par.map((_, i) => find(i)); RES.nodeAt = nm;
+  harmSolve(nn, w);
   for (const k in RES.comp) for (const q of ['Vr','Ir','P']) if (RES.comp[k][q] !== undefined && !isFinite(RES.comp[k][q])) RES.ok = false;
 }
 
@@ -4359,6 +4366,19 @@ void loop() {
     C('sw', 12, 12, {r:1, n:'แตะสายไฟ', on:false}); W([12,10],[12,11]);
     C('human', 12, 15, {r:1, n:'คน', model:'normal'}); W([12,13],[12,14]); C('gnd', 12, 16, {});
   })},
+  harmonic: {nm:'ฮาร์มอนิกและเรโซแนนซ์: ไดรฟ์ 6 พัลส์ + คาปาซิเตอร์ (หม้อแปลง 160 kVA)', f:() => build((C,W) => {
+    C('src3', 2, 1, {n:'การไฟฟ้า', model:'tr160', kva:160, zpct:4, xr:3});
+    W([1,2],[1,3]); W([2,2],[2,4]); W([3,2],[3,5]); W([1,3],[26,3]); W([2,4],[23,4]); W([3,5],[23,5]);
+    const feed = (X, y2) => { W([X-1,3],[X-1,y2]); W([X,4],[X,y2]); W([X+1,5],[X+1,y2]); };
+    feed(8, 12); C('nl3', 8, 13, {n:'VFD1', P:60, V:400, kind:'6p'});
+    feed(12, 12); C('motor3', 12, 13, {n:'M1', P:30, pf:0.86, eff:0.93, Ist:6.5});
+    [[18, 'K1', 'CB1'], [22, 'K2', 'CB2']].forEach(([X, k, n]) => { feed(X, 9); C('k3', X, 10, {ref:k, In:150});
+      W([X-1,11],[X-1,12]); W([X,11],[X,12]); W([X+1,11],[X+1,12]); C('capbank', X, 13, {n, kvar:80, V:400, det:'0'}); });
+    // สวิตช์สับคาปาซิเตอร์ (วงจรควบคุม 230 V L1–N)
+    W([26,3],[26,17]); W([15,17],[26,17]); W([4,2],[4,24]); W([4,24],[20,24]);
+    C('sw', 16, 20, {n:'S1', on:false}); W([15,17],[15,20]); C('coil', 19, 20, {n:'K1'}); W([17,20],[18,20]); W([20,20],[20,22]);
+    C('sw', 16, 22, {n:'S2', on:false}); W([15,20],[15,22]); C('coil', 19, 22, {n:'K2'}); W([17,22],[18,22]); W([20,22],[20,24]);
+  })},
   pfcauto: {nm:'ตู้ PFC 3 เฟสอัตโนมัติ 4 สเต็ป (หม้อแปลง 160 kVA)', f:() => build((C,W) => {
     C('src3', 2, 1, {n:'การไฟฟ้า', model:'tr160', kva:160, zpct:4, xr:3});
     // บัสบาร์ L1 L2 L3 (y = 3, 4, 5) · N ลงไปเป็นสายกลับของวงจรควบคุม (y = 28)
@@ -5198,6 +5218,10 @@ function drawBlock(c, ghost){
       const a = c._ang || 0; ctx.strokeStyle = K.accent; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X, Y, 27, a, a + 0.9); ctx.stroke();
       if (c._hum) text('ครางเฟสขาด!', X, by + bh + 10, 10, K.bad, 'center', '600');
     } break;
+    case 'nl3': {
+      text('≋ ' + ({'6p':'ไดรฟ์ 6P', '6pdc':'6P+DC choke', afe:'AFE'})[c.kind] || '', X, Y - 6, 10, K.comp, 'center', '600', true);
+      text(c.P + ' kW', X, Y + 10, 9, K.muted, 'center', '600', true);
+    } break;
     case 'capbank': {
       ctx.strokeStyle = K.comp; ctx.lineWidth = 2;
       for (let k = -1; k <= 1; k++){ const x = X + k*G; line(x, Y - G, x, Y - 4); line(x - 7, Y - 4, x + 7, Y - 4); line(x - 7, Y + 2, x + 7, Y + 2); }
@@ -5728,7 +5752,9 @@ const F = {
   motor6:[NMF,['V','แรงดันพิกัด (Δ)','num','V'],['P','กำลังเพลา','num','kW'],['load','ภาระทางกล (% แรงบิดพิกัด)','num','%'],['pf','ตัวประกอบกำลัง','num',''],['eff','ประสิทธิภาพ','num',''],['Ist','กระแสสตาร์ท (× In)','num','']],
   cable:[NMF,['A','ขนาดหน้าตัด','sel',Object.fromEntries(Object.keys(CABLE).map(k => [k, k + ' mm²']))],['len','ความยาว','num','m'],['mat','ตัวนำ','sel',{Cu:'ทองแดง',Al:'อะลูมิเนียม'}]],
   pfcr:[NMF,['meas','วัดที่ (ชื่อแหล่งจ่าย/มิเตอร์)','txt'],['pft','PF เป้าหมาย','num',''],['steps','ขนาดสเต็ป Q1–Q4','txt','kvar'],['delay','หน่วงระหว่างสับ','num','s'],['dis','เวลาคายประจุก่อนสับซ้ำ','num','s'],['auto','ทำงานอัตโนมัติ','bool','อัตโนมัติ']],
-  capbank:[NMF,['kvar','ขนาด','num','kvar'],['V','แรงดัน','num','V'],['lr','รีแอกเตอร์จำกัดกระแสกระชาก (ต่อเฟส)','num','µH']],
+  nl1:[NMF,['V','แรงดันพิกัด','num','V'],['P','กำลัง','num','W'],['kind','ชนิด','sel',{smps:'SMPS ไม่มี PFC (คอมพิวเตอร์/ทีวี) THDi ≈ 110%',led:'ไดรเวอร์ LED ราคาถูก THDi ≈ 65%',apfc:'มี Active PFC THDi ≈ 8%'}]],
+  nl3:[NMF,['V','แรงดันระหว่างสาย','num','V'],['P','กำลัง','num','kW'],['kind','ชนิด','sel',{'6p':'ไดรฟ์ 6 พัลส์ ไม่มีโช้ก THDi ≈ 75%','6pdc':'ไดรฟ์ 6 พัลส์ + DC choke THDi ≈ 36%',afe:'Active Front End THDi ≈ 4%'}]],
+  capbank:[NMF,['kvar','ขนาด','num','kvar'],['V','แรงดัน','num','V'],['det','รีแอกเตอร์ดีจูน (p)','sel',{'0':'ไม่มี','7':'7% (จูน 189 Hz)','14':'14% (จูน 134 Hz)'}],['lr','รีแอกเตอร์จำกัดกระแสกระชาก (ต่อเฟส)','num','µH']],
   pmeter:[NMF],
   scope:[NMF,['earth','กราวด์โพรบ','bool','ต่อสายดิน (เครื่องตั้งโต๊ะ)']],
   dcm:[NMF,['V','แรงดันพิกัด','num','V'],['R','ความต้านทานขดลวด','num','Ω']],
@@ -5831,6 +5857,8 @@ const NOTES = {
   ol:'โอเวอร์โหลดรีเลย์แบบความร้อน: ต่ออนุกรมกับสายมอเตอร์ ตั้ง Ir = กระแสพิกัดมอเตอร์ · เมื่อกระแสเกินนาน หรือเฟสขาด หน้าสัมผัส 95–96 (NC) จะเปิด ต้องต่ออนุกรมในวงจรคอยล์คอนแทกเตอร์ · คลิกเพื่อรีเซ็ต',
   motor6:'มอเตอร์ 3 เฟสที่นำปลายขดลวดออกมา 6 ขั้ว (U1–U2, V1–V2, W1–W2) · ต่อสตาร์ (U2-V2-W2 รวมกัน) ขดลวดรับ 230 V กระแสสตาร์ทเหลือ 1/3 · ต่อเดลต้า (U1–W2, V1–U2, W1–V2) ขดลวดรับ 400 V ทำงานเต็มกำลัง',
   cable:'สายไฟมีความต้านทาน R = ρL/A ทำให้แรงดันตกและร้อน · เลือกขนาดสายให้ทนกระแสได้มากกว่าพิกัดเบรกเกอร์ (เช่น C16 ใช้ 2.5 mm², C32 ใช้ 6 mm²) · แรงดันตกไม่ควรเกิน 5% · ตัวอย่างนี้วาดเส้นเดียวแทนตัวนำ 1 เส้น',
+  nl1:'โหลดอิเล็กทรอนิกส์ที่มีวงจรเรียงกระแส + ตัวเก็บประจุ ดึงกระแสเป็นพัลส์แคบตอนแรงดันยอด → ฮาร์มอนิกลำดับคี่ (3, 5, 7, …) ไหลกลับเข้าระบบ ทำให้แรงดันผิดรูปตามอิมพีแดนซ์ของหม้อแปลง · ดูรูปคลื่นในกราฟสด',
+  nl3:'ไดรฟ์/อินเวอร์เตอร์ที่มีวงจรเรียงกระแส 6 พัลส์ สร้างฮาร์มอนิก 5, 7, 11, 13, … ถ้ามีคาปาซิเตอร์แก้ PF ไม่มีรีแอกเตอร์ อาจเกิดเรโซแนนซ์ขยายฮาร์มอนิกจนคาปาซิเตอร์ร้อน/ระเบิด',
   pfcr:'ตัวควบคุม PF: วัด P และ Q ที่จุดจ่ายไฟ (ช่อง "วัดที่") แล้วสับ/ปลดคาปาซิเตอร์ทีละสเต็ปผ่านรีเลย์ C–Q1..Q4 ไปยังขดคอนแทกเตอร์ ให้ PF เข้าใกล้เป้าหมาย · ปลดแล้วต้องรอคายประจุก่อนสับซ้ำ · ไฟเลี้ยง L–N 230 V',
   capbank:'คาปาซิเตอร์แบงก์ต่อเดลต้า จ่ายกำลังรีแอกทีฟ (kvar) ชดเชยโหลดเหนี่ยวนำ เช่น มอเตอร์ ทำให้ตัวประกอบกำลังดีขึ้น กระแสในสายลดลง และลดค่าปรับ PF ต่ำ',
   scope:'ออสซิลโลสโคปวาดแรงดันตามเวลา: ต่อโพรบ CH1/CH2 กับจุดที่ต้องการวัด และคลิปกราวด์ (⏚) กับจุดอ้างอิง · คลิกที่ตัวเครื่องเพื่อเปิดหน้าจอเต็ม · ใช้ Auto Set ให้ปรับสเกลเอง · ⚠ เครื่องตั้งโต๊ะต่อกราวด์โพรบลงสายดิน ห้ามคลิปกราวด์กับสาย L — จะลัดวงจรผ่านสายดิน (ใช้หม้อแปลงแยกวงจรหรือโพรบดิฟเฟอเรนเชียล)',
@@ -5940,6 +5968,14 @@ function compHTML(c){
   if (c.t === 'human') st.push(R.Ir > 0.03 ? tag('bad','อันตรายถึงชีวิต') : R.Ir > 0.01 ? tag('bad','กล้ามเนื้อเกร็ง ปล่อยมือไม่ได้') : R.Ir > 0.001 ? tag('warn','รู้สึกเจ็บ') : tag('ok','ปลอดภัย'));
   if (c.t === 'estop') st.push(c.act ? tag('bad','ถูกกด — วงจรตัด (หมุนเพื่อปลด)') : tag('ok','ปกติ'));
   if ((c.t === 'motor1' || c.t === 'pump') && R.Ir > 0) add('กระแสพิกัด', fmt(c.P*1000/(c.eff*c.pf*c.V), 'A'));
+  if (R.hi && R.hi[0] && R.hi[0].length){ const pr = lgPairs(c);
+    if (pr){ const [v, i] = pr[0], ti = thdOf(i, i.hh), tv = thdOf(v, v.hh), I1 = Math.hypot(i.r || 0, i.i || 0);
+      add('ฮาร์มอนิก THDi / THDv', ti.toFixed(1) + '% / ' + tv.toFixed(1) + '%' + (pr.length === 3 ? ' (L1)' : ''));
+      add('กระแสรวม RMS (รวมฮาร์มอนิก)', fmt(I1*Math.sqrt(1 + (ti/100)**2), 'A') + ' · หลัก ' + fmt(I1, 'A'));
+      add('สเปกตรัมกระแส', i.hh.filter(([, r, q]) => Math.hypot(r, q) > 0.01*I1).map(([h, r, q]) => 'H' + h + ' ' + fmt(Math.hypot(r, q), 'A') + ' (' + Math.round(Math.hypot(r, q)/I1*100) + '%)').join(' · ') || '—');
+      if (tv > 8 && (c.t === 'src1' || c.t === 'src3' || c.t === 'pmeter')) st.push(tag('bad', 'THDv ' + tv.toFixed(1) + '% เกิน 8% (EN 50160)')); else if (tv > 5 && (c.t === 'src1' || c.t === 'src3' || c.t === 'pmeter')) st.push(tag('warn', 'THDv เกิน 5% (IEEE 519)'));
+      if (c.t === 'capbank' && ti > 30) st.push(tag('bad', 'กระแสฮาร์มอนิกในคาปาซิเตอร์สูง ' + ti.toFixed(0) + '% — ร้อนเกิน อายุสั้น/ระเบิด · ใช้รีแอกเตอร์ดีจูน 7%')); } }
+  if (c.t === 'capbank'){ const hr = harmRes(); if (hr) add('เรโซแนนซ์ขนานกับหม้อแปลง', 'h ≈ ' + hr.h.toFixed(2) + ' (' + fmt(hr.h*(RES.f || 50), 'Hz') + ')' + (hr.det ? ' · มีรีแอกเตอร์ดีจูน' : '')); }
   if (c.t === 'cap' && c._inr){ const q = c._inr; add('กระแสกระชากล่าสุด', fmt(q.pk, 'A') + ' (' + q.x + '× ของยอดปกติ) · สั่น ' + fmt(q.f0, 'Hz'));
     st.push(q.x > 100 ? tag('bad', 'กระแสกระชากเกิน 100 เท่า — ใส่รีแอกเตอร์จำกัดกระแส (lr) หรือคอนแทกเตอร์สำหรับตัวเก็บประจุ') : tag('ok', 'กระแสกระชากอยู่ในเกณฑ์')); }
   if (['motor1', 'pump', 'motor3', 'motor6'].includes(c.t)){ const L = motLoad(c), n = motRpm(c);
@@ -6153,7 +6189,10 @@ function warnList(){
   for (const c of S.comps){
     const R = RES.comp[c.id] || {}, n = esc(c.n || c.ref || T[c.t].nm);
     const srcI = c.t === 'src1' ? R.I : c.t === 'src3' ? Math.max(...(R.Iph||[0])) : (c.t === 'bat' || c.t === 'acs') ? R.Ir : 0;
-    if (srcI > 100) w.push(['bad', `ลัดวงจร! ${n} จ่ายกระแส ${fmt(srcI, 'A')}`]);
+    const zS = (c.t === 'src1' || c.t === 'src3') ? srcZ(c) : null, iLim = zS && !zS.ideal ? Math.max(100, 2*c.kva*1000/(c.t === 'src3' ? SQ3*c.V : c.V)) : 100;   // หม้อแปลงใหญ่: เกิน 2 เท่าพิกัด
+    if (srcI > iLim) w.push(['bad', `ลัดวงจร! ${n} จ่ายกระแส ${fmt(srcI, 'A')}`]);
+    if ((c.t === 'src1' || c.t === 'src3') && R.hv && R.hv[0]){ const v = c.t === 'src1' ? sub(R.pv[0], R.pv[1]) : sub(R.pv[0], R.pv[3]), tv = thdOf(v, R.hv[0]); if (tv > 8) w.push(['warn', `${n}: แรงดันผิดรูป THDv ${tv.toFixed(1)}% (เกิน 8%) จากโหลดไม่เชิงเส้น`]); }
+    if (c.t === 'capbank' && R.hi && R.hi[0]){ const ti = thdOf(R.iL[0], R.hi[0]); if (ti > 30) w.push(['bad', `${n}: กระแสฮาร์มอนิกในคาปาซิเตอร์ ${ti.toFixed(0)}% — เสี่ยงร้อน/ระเบิด (เรโซแนนซ์) ใช้รีแอกเตอร์ดีจูน`]); }
     if (c.t === 'mcb' && c.icu > 0){ const isc = sysIsc(); if (isc > c.icu*1000) w.push(['bad', `${n}: พิกัดตัด Icu ${c.icu} kA ต่ำกว่ากระแสลัดวงจรของระบบ ${fmt(isc, 'A')} — ลัดวงจรแล้วเบรกเกอร์อาจระเบิด เลือกรุ่น Icu สูงขึ้น`]); }
     if ((c.t === 'src1' || c.t === 'src3') && !srcZ(c).ideal){ const R2 = RES.comp[c.id] || {}, three = c.t === 'src3', Vn = three ? c.V/SQ3 : c.V;
       const Vt = three ? (R2.pv ? Math.min(...[0, 1, 2].map(k => rms(sub(R2.pv[k], R2.pv[3])))) : Vn) : (R2.V || Vn);
@@ -7529,7 +7568,9 @@ function scopeSwitchers(){
   return L.slice(0, 3);
 }
 // แรงดัน CH1/CH2 เทียบกราวด์โพรบ ({d, r, i} = DC + เฟเซอร์ RMS)
-function scopeProbe(c){ const R = RES.comp[c.id]; if (!R || !R.pv) return null; return [0, 1].map(k => { const o = scCp(c, k); return o ? scCurPh(o) : sub(R.pv[k], R.pv[2]); }); }
+function scopeProbe(c){ const R = RES.comp[c.id]; if (!R || !R.pv) return null;
+  return [0, 1].map(k => { const o = scCp(c, k); if (o){ const p = scCurPh(o), Ro = RES.comp[o.id]; if (Ro && Ro.hi && Ro.hi[0]) p.hh = Ro.hi[0].map(([h, r, i]) => scIsrc(o) || o.t === 'src3' ? [h, r, i] : [h, r, i]); return p; }
+    const p = sub(R.pv[k], R.pv[2]), hh = RES.harm && c._n ? harmNodes(c._n[k], c._n[2]) : null; if (hh) p.hh = hh; return p; }); }
 function scopeRecord(){
   for (const c of S.comps) if (c.t === 'scope' && c.run !== false){
     const p = scopeProbe(c); if (!p) continue;
@@ -7600,7 +7641,7 @@ function scopeCapture(c, sws, bs){
   const base = scopeProbe(c); if (!base) return null;
   const T = c.tdiv*10, roll = c.tdiv >= 0.1, cap = {roll, T, ch:[], trig:false};
   const chs = [0, 1].map(k => {
-    const ch = {d:base[k].d, A:Math.SQRT2*acm(base[k]), ph:Math.atan2(base[k].i, base[k].r), f:RES.f || 50, sw:null};
+    const ch = {d:base[k].d, A:Math.SQRT2*acm(base[k]), ph:Math.atan2(base[k].i, base[k].r), f:RES.f || 50, sw:null, hh:base[k].hh};
     if (!roll) for (const s of sws){ const hi = s.hi.get(c.id), lo = s.lo.get(c.id); if (!hi || !lo) continue;
       const e = Math.abs(hi[k] - lo[k]); if (e > 0.01 && (!ch.sw || e > Math.abs(ch.sw.hi - ch.sw.lo))) ch.sw = {f:s.f, duty:s.duty, hi:hi[k], lo:lo[k], nm:s.nm}; }
     if (ch.A < 1e-4) ch.A = 0;
@@ -7626,6 +7667,7 @@ function scopeCapture(c, sws, bs){
       const ch = chs[k], tt = simT + t;
       let v = ch.sw ? ch.sw.lo + (ch.sw.hi - ch.sw.lo)*((((tt*ch.sw.f) % 1) + 1) % 1 < ch.sw.duty ? 1 : 0) : ch.d;
       if (ch.A) v += ch.A*Math.sin(2*Math.PI*ch.f*tt + ch.ph);
+      if (ch.hh) for (const [h, r, i] of ch.hh) v += Math.SQRT2*Math.hypot(r, i)*Math.sin(2*Math.PI*h*ch.f*tt + Math.atan2(i, r));
       return cpl(k) ? v - ch.mean : v; };
     // ทริกเกอร์: หาจุดตัดระดับ (ขาขึ้น/ขาลง) แรกในช่วงหนึ่งคาบที่ยาวที่สุด
     const tk = c.trig === '2' ? 1 : 0, tc = chs[tk], per = Math.max(tc.sw ? 1/tc.sw.f : 0, tc.A ? 1/tc.f : 0);
@@ -7725,6 +7767,7 @@ function scopeFFT(c, fn, chs){
     const dc = (sw ? sw.lo + A2*sw.duty : ch.d) - (cpl ? ch.mean : 0), hc = [];
     for (let n = 1; n <= nh; n++) hc.push(A2*2/(n*Math.PI)*Math.sin(n*Math.PI*sw.duty));
     return t => { let v = dc + (ch.A ? ch.A*Math.sin(2*Math.PI*ch.f*t + ch.ph) : 0);
+      if (ch.hh) for (const [h, r, i] of ch.hh) v += Math.SQRT2*Math.hypot(r, i)*Math.sin(2*Math.PI*h*ch.f*t + Math.atan2(i, r));
       for (let n = 1; n <= nh; n++) v += hc[n - 1]*Math.cos(2*Math.PI*n*sw.f*t - n*Math.PI*sw.duty); return v; }; };
   let g0 = syn(0), g1 = syn(1);
   if (TR.active && TR.tw && c._n){ const t0 = simT - N*dt, pr = kk => t => trNodeAt(c._n[kk], t0 + t) - trNodeAt(c._n[2], t0 + t) - (c['cpl' + (kk + 1)] === 'AC' ? chs[kk].d : 0); g0 = pr(0); g1 = pr(1); }
@@ -8811,6 +8854,83 @@ function capInrush(dt){
     INR.ev = {c, th, w, tr, vtr:null, Ic:R.iL, comps, wall:performance.now(), pk, f0:wd/(2*Math.PI), tSim:simT, tEv};
   }
 }
+
+/* ============================================================
+   ฮาร์มอนิก — โหลดไม่เชิงเส้น (nl1, nl3) เป็นแหล่งกระแสที่ความถี่ h·f แก้วงจรเชิงเส้นแยกทีละลำดับ (superposition กับผลหลัก)
+   แหล่งจ่าย = R + j·h·X ของหม้อแปลง (srcZ; อุดมคติ = 0.05 Ω + 20 µH) · ตัวเก็บประจุ ×h · โหลดเหนี่ยวนำ X×h · มอเตอร์ = รีแอกแตนซ์ล็อกโรเตอร์ × h
+   คาปาซิเตอร์แบงก์ + รีแอกเตอร์ดีจูน p: Z = j(h·p − 1/h)·Xc · เฟสของฮาร์มอนิก: พัลส์ตรงยอดแรงดัน (SMPS) / บล็อก 120° (6 พัลส์: h = 6k−1 กลับเครื่องหมาย)
+   ผลต่ออุปกรณ์: R.hv / R.hi = [คู่][ [h, re, im] ] (RMS) → กราฟสด สโคป แผงขวา คำเตือน
+   ============================================================ */
+const HSPEC = {smps:{3:.8, 5:.6, 7:.4, 9:.22, 11:.1, 13:.06}, led:{3:.5, 5:.3, 7:.2, 9:.12, 11:.08}, apfc:{3:.06, 5:.04, 7:.03},
+  '6p':{5:.63, 7:.38, 11:.08, 13:.05, 17:.03, 19:.02}, '6pdc':{5:.33, 7:.1, 11:.06, 13:.04, 17:.03, 19:.02}, afe:{5:.03, 7:.02, 11:.01, 13:.01}};
+const hspec = c => HSPEC[c.kind] || HSPEC[c.t === 'nl3' ? '6p' : 'smps'];
+function harmSolve(nn, w){
+  for (const c of S.comps){ const R = RES.comp[c.id]; if (R){ delete R.hv; delete R.hi; } }
+  RES.harm = null;
+  const NL = S.comps.filter(c => (c.t === 'nl1' || c.t === 'nl3') && RES.comp[c.id] && RES.comp[c.id].ac !== false);
+  if (!NL.length || !RES.ok) return;
+  const hs = [...new Set(NL.flatMap(c => Object.keys(hspec(c)).map(Number)))].sort((a, b) => a - b), N = nn;
+  const out = {hs, V:{}}, elY = new Map();                                  // elY: id → (h) → ฟังก์ชันกระแสของอุปกรณ์
+  const z2y = (R, X) => { const d = R*R + X*X || 1e-12; return [R/d, -X/d]; }, cm = (a, b) => [a[0]*b[0] - a[1]*b[1], a[0]*b[1] + a[1]*b[0]];
+  for (const h of hs){
+    const Ar = new Float64Array(N*N), Ai = new Float64Array(N*N), br = new Float64Array(N), bi = new Float64Array(N);
+    const M = (i, j, r, im) => { Ar[i*N + j] += r; Ai[i*N + j] += im; };
+    const Y = (a, b, y) => { if (a) M(a - 1, a - 1, y[0], y[1]); if (b) M(b - 1, b - 1, y[0], y[1]); if (a && b){ M(a - 1, b - 1, -y[0], -y[1]); M(b - 1, a - 1, -y[0], -y[1]); } };
+    const G = [GW, 0], el = [];                                              // el: [comp, คู่ขา [a, b], y] สำหรับคำนวณกระแสภายหลัง
+    for (let i = 0; i < N; i++) M(i, i, 1e-6, 0);
+    for (const wr of S.wires) Y(wr._a, wr._b, G);
+    for (const [a, b] of lblPairs(c => c._n[0])) Y(a, b, G);
+    for (const c of S.comps){ const n = c._n; if (!n) continue;
+      switch (c.t){
+        case 'src1': case 'src3': { const z = srcZ(c), x = z.ideal ? w*20e-6 : z.x, y = z2y(z.r, h*x); const ks = c.t === 'src1' ? [[0, 1]] : [[0, 3], [1, 3], [2, 3]];
+          for (const [a, b] of ks){ Y(n[a], n[b], y); el.push([c, a, n[a], n[b], y]); } Y(n[c.t === 'src1' ? 1 : 3], 0, G); } break;
+        case 'acs': case 'bat': Y(n[0], n[1], z2y(0.05, 0)); break;
+        case 'capbank': { const Cp = c.kvar*1000/3/(w*c.V*c.V), Xc = 1/(w*Cp), p = (+c.det || 0)/100, y = z2y(0.002*Xc, (h*p - 1/h)*Xc);
+          for (let k = 0; k < 3; k++){ Y(n[k], n[(k + 1)%3], y); el.push([c, k, n[k], n[(k + 1)%3], y]); } } break;
+        case 'motor3': case 'motor6': { const In = c.P*1000/(SQ3*c.V*(c.eff || 0.85)*(c.pf || 0.85)), Ist = c.Ist || 6;
+          if (c.t === 'motor3'){ const X = c.V/SQ3/(Ist*In), y = z2y(0.15*X, h*X); for (let k = 0; k < 3; k++){ Y(n[k], c._star, y); el.push([c, k, n[k], c._star, y]); } }
+          else { const X = c.V/(Ist*In/SQ3), y = z2y(0.15*X, h*X); for (let k = 0; k < 3; k++){ Y(n[k], n[k + 3], y); el.push([c, k, n[k], n[k + 3], y]); } } } break;
+        case 'k3': if (contactClosed(c.ref)) for (let k = 0; k < 3; k++) Y(n[k], n[k + 3], G); break;
+        case 'ol': for (let k = 0; k < 3; k++) Y(n[k], n[k + 3], G); break;
+        case 'pmeter': case 'rcd': if (c.t === 'pmeter' || c.on){ Y(n[0], n[2], G); Y(n[1], n[3], G); el.push([c, 0, n[0], n[2], G]); } break;
+        case 'nl1': case 'nl3': break;
+        default: if (isTwo(c)){ let y0 = null; try { y0 = admit(c, true, w); } catch (e) {}
+          if (y0 && isFinite(y0[0]) && isFinite(y0[1])){ const [g, b] = y0; let y;
+            if (b > 0) y = [g, h*b]; else if (b < 0){ const d = g*g + b*b; y = z2y(g/d, -h*b/d); } else y = [g, 0];
+            Y(n[0], n[1], y); el.push([c, 0, n[0], n[1], y]); } }
+      } }
+    // แหล่งกระแสฮาร์มอนิก: กระแสไหลจากขาเข้าโหลด (ดึงออกจากโหนด)
+    const inj = [];
+    for (const c of NL){ const R = RES.comp[c.id], a = hspec(c)[h]; if (!a) continue; const sg = c.t === 'nl3' && h%6 === 5 ? Math.PI : 0;
+      const one = (p, k, A, B) => { const m = Math.hypot(p.r || 0, p.i || 0)*a, ph = Math.PI/2 - h*(Math.PI/2 - Math.atan2(p.i || 0, p.r || 0)) + sg, re = m*Math.cos(ph), im = m*Math.sin(ph);
+        if (A){ br[A - 1] -= re; bi[A - 1] -= im; } if (B){ br[B - 1] += re; bi[B - 1] += im; } inj.push([c, k, re, im]); };
+      if (c.t === 'nl1') one(R.i, 0, c._n[0], c._n[1]); else for (let k = 0; k < 3; k++) one(R.iL[k], k, c._n[k], 0); }
+    const [xr, xi] = csolve(Ar, Ai, br, bi, N), Vn = k => k ? [xr[k - 1], xi[k - 1]] : [0, 0], dv = (a, b) => { const p = Vn(a), q = Vn(b); return [p[0] - q[0], p[1] - q[1]]; };
+    out.V[h] = [xr, xi];
+    // แนบผลกับอุปกรณ์
+    const put = (c, k, key, v) => { const R = RES.comp[c.id]; if (!R) return; const L = R[key] || (R[key] = []); (L[k] || (L[k] = [])).push([h, v[0], v[1]]); };
+    for (const [c, k, a, b, y] of el){ const v = dv(a, b), i = cm(y, v);
+      if (c.t === 'src1' || c.t === 'src3'){ put(c, k, 'hv', v); put(c, k, 'hi', [-i[0], -i[1]]); }
+      else if (c.t === 'capbank'){ const R = RES.comp[c.id]; (R._leg || (R._leg = {}))[h + ':' + k] = i; }
+      else if (c.t === 'pmeter' || c.t === 'rcd'){ put(c, 0, 'hv', dv(c._n[0], c._n[1])); put(c, 0, 'hi', i); }
+      else if (c.t === 'motor3' || c.t === 'motor6'){ put(c, k, 'hv', v); put(c, k, 'hi', i); }
+      else { put(c, 0, 'hv', v); put(c, 0, 'hi', i); } }
+    for (const c of S.comps) if (c.t === 'capbank' && RES.comp[c.id] && RES.comp[c.id]._leg){ const L = RES.comp[c.id]._leg;
+      for (let k = 0; k < 3; k++){ const a = L[h + ':' + k], b = L[h + ':' + ((k + 2)%3)]; if (a && b){ put(c, k, 'hv', Vn(c._n[k])); put(c, k, 'hi', [a[0] - b[0], a[1] - b[1]]); } } delete RES.comp[c.id]._leg; }
+    for (const [c, k, re, im] of inj){ put(c, k, 'hi', [re, im]); put(c, k, 'hv', c.t === 'nl1' ? dv(c._n[0], c._n[1]) : Vn(c._n[k])); }
+  }
+  RES.harm = out;
+}
+// THD (%) ของรายการ [h, re, im] เทียบเฟเซอร์หลัก p
+const thdOf = (p, hh) => { const a = Math.hypot(p.r || 0, p.i || 0); if (!hh || !hh.length || a < 1e-9) return 0; return Math.sqrt(hh.reduce((s, [, r, i]) => s + r*r + i*i, 0))/a*100; };
+// แรงดันฮาร์มอนิกระหว่างโหนด a, b (สำหรับโพรบสโคป)
+function harmNodes(a, b){ const H = RES.harm; if (!H) return null; const L = [];
+  for (const h of H.hs){ const [xr, xi] = H.V[h], V = k => k ? [xr[k - 1], xi[k - 1]] : [0, 0], p = V(a), q = V(b); L.push([h, p[0] - q[0], p[1] - q[1]]); } return L; }
+// ความถี่เรโซแนนซ์ขนานระหว่างหม้อแปลงกับคาปาซิเตอร์ที่สับอยู่ (ลำดับ h) — h = √(Ssc/Qc)
+function harmRes(){ const s = S.comps.find(o => o.t === 'src3' && !srcZ(o).ideal); if (!s) return null;
+  const Ssc = s.kva/((+s.zpct || 4)/100); let Q = 0, det = true;
+  for (const c of S.comps) if (c.t === 'capbank'){ const R = RES.comp[c.id]; if (R && R.vLL && acm(R.vLL[0]) > 0.5*c.V){ Q += c.kvar; if (!(+c.det > 0)) det = false; } }
+  return Q > 0 ? {h:Math.sqrt(Ssc/Q), Q, det} : null; }
 /* ---------- กราฟสด (#lgraph): แรงดัน กระแส กำลัง ของอุปกรณ์ที่เลือก ซ้อนในกราฟเดียว ----------
    AC: 2 คาบ ทริกที่จุดตัดศูนย์ขาขึ้นของแรงดัน (เฟเซอร์ หรือบัฟเฟอร์โหมดตามเวลา) · แบบไหล (LG.win): เฟเซอร์ที่บันทึกใน LG.ph ทุก step → รูปคลื่นตามเวลาจริง (DC/2 คาบ = 10 s)
    อุปกรณ์ 3 เฟส (src3, motor3/6): แรงดันเฟส U + กระแส U V W + กำลังรวมขณะหนึ่ง */
@@ -8818,24 +8938,28 @@ const LG = {win:(() => { try { return localStorage.getItem('circuit-lab-lgwin') 
 const LG_COL = {V:'#2563eb', I:['#dc2626', '#d97706', '#7c3aed'], P:'#16a34a'};
 const lgNeg = p => ({d:-(p.d || 0), r:-(p.r || 0), i:-(p.i || 0)});
 // คู่ [แรงดัน, กระแส] (เฟเซอร์ {d, r, i} ค่า RMS) ของอุปกรณ์ · null = ไม่มีข้อมูล
-function lgPairs(c){ const R = RES.comp[c.id]; if (!R) return null;
+// คู่ [V, I] + ฮาร์มอนิก (hh) จาก harmSolve
+function lgPairs(c){ const pr = lgPairs0(c), R = RES.comp[c.id]; if (!pr || !R || !(R.hv || R.hi)) return pr;
+  return pr.map(([v, i], k) => [Object.assign({}, v, {hh:R.hv && R.hv[k]}), Object.assign({}, i, {hh:R.hi && R.hi[k]})]); }
+function lgPairs0(c){ const R = RES.comp[c.id]; if (!R) return null;
   if (c.t === 'src1' && R.pv && R.i) return [[sub(R.pv[0], R.pv[1]), lgNeg(R.i[0])]];
   if (c.t === 'src3' && R.pv && R.i) return [0, 1, 2].map(k => [sub(R.pv[k], R.pv[3]), lgNeg(R.i[k])]);
   if ((c.t === 'pmeter' || c.t === 'rcd') && R.vL && R.iL) return [[R.vL, R.iL]];
-  if (c.t === 'capbank' && R.iL && R.pv) return [0, 1, 2].map(k => [R.pv[k], R.iL[k]]);
+  if ((c.t === 'capbank' || c.t === 'nl3') && R.iL && R.pv) return [0, 1, 2].map(k => [R.pv[k], R.iL[k]]);
   if ((c.t === 'motor3' || c.t === 'motor6') && R.vw && R.iw) return [0, 1, 2].map(k => [R.vw[k], R.iw[k]]);
   if (isTwo(c) && R.v && R.i && !Array.isArray(R.i)) return [[R.v, scIsrc(c) ? lgNeg(R.i) : R.i]];
   return null; }
-const lgAt = (p, w, t) => (p.d || 0) + Math.SQRT2*Math.hypot(p.r || 0, p.i || 0)*Math.sin(w*t + Math.atan2(p.i || 0, p.r || 0));
+const lgAt = (p, w, t) => { let v = (p.d || 0) + Math.SQRT2*Math.hypot(p.r || 0, p.i || 0)*Math.sin(w*t + Math.atan2(p.i || 0, p.r || 0));
+  if (p.hh) for (const [h, r, i] of p.hh) v += Math.SQRT2*Math.hypot(r, i)*Math.sin(h*w*t + Math.atan2(i, r)); return v; };
 // อุปกรณ์ที่กราฟแสดง: ที่ล็อกไว้ (📌) ก่อน ไม่งั้นตัวที่เลือก
 function lgTarget(){ if (LG.lock){ const c = S.comps.find(o => o.id === LG.lock && o.n === LG.lockN); if (c) return c; LG.lock = null; } return sel && sel.k === 'c' ? sel.c : null; }
 // บันทึกเฟเซอร์ของอุปกรณ์ที่ดูทุก step (เฉพาะเมื่อเปลี่ยน) → กราฟแบบไหลสร้างรูปคลื่นจริงตามเวลาจำลอง · ตอนสับตัวเก็บประจุ ใช้เวลาสับจริง (INR.ev.tEv)
 function lgRec(){ if (!LG.on) return; const c = lgTarget(); if (!c) return;
   if (LG.id !== c.id){ LG.id = c.id; LG.ph = []; }
   const pr = lgPairs(c); if (!pr) return;
-  const cl = pr.map(([v, i]) => [{d:v.d || 0, r:v.r || 0, i:v.i || 0}, {d:i.d || 0, r:i.r || 0, i:i.i || 0}]), E = INR.ev;
+  const cl = pr.map(([v, i]) => [{d:v.d || 0, r:v.r || 0, i:v.i || 0, hh:v.hh}, {d:i.d || 0, r:i.r || 0, i:i.i || 0, hh:i.hh}]), E = INR.ev;
   const t = E && E.tSim === simT && E.comps.has(c.id) ? E.tEv : simT, last = LG.ph[LG.ph.length - 1];
-  const same = last && last.pr.length === cl.length && last.pr.every((pq, k) => pq.every((p, j) => { const q = cl[k][j], m = Math.max(1e-9, Math.hypot(q.d, q.r, q.i)); return Math.abs(p.d - q.d) + Math.abs(p.r - q.r) + Math.abs(p.i - q.i) < 1e-4*m; }));
+  const same = last && last.pr.length === cl.length && last.pr.every((pq, k) => pq.every((p, j) => { const q = cl[k][j], m = Math.max(1e-9, Math.hypot(q.d, q.r, q.i)); return Math.abs(p.d - q.d) + Math.abs(p.r - q.r) + Math.abs(p.i - q.i) < 1e-4*m && Math.abs(thdOf(p, p.hh) - thdOf(q, q.hh)) < 0.05; }));
   if (!same) LG.ph.push({t, pr:cl});
   while (LG.ph.length > 2 && LG.ph[1].t < simT - 12) LG.ph.shift(); if (LG.ph.length > 6000) LG.ph.splice(0, LG.ph.length - 6000); }
 function lgDraw(){
@@ -8883,7 +9007,7 @@ function lgDraw(){
       return [p.map(([v], k) => lgAt(v, w, t) + (de != null && c === E.c && E.vtr ? E.vtr[k](de) : 0)), p.map(([, i], k) => lgAt(i, w, t) + (de != null ? es.s*E.tr[k](de) : 0))]; };
     const mk = () => ({lo:new Float32Array(NC).fill(NaN), hi:new Float32Array(NC).fill(NaN)}), bV = mk(), bI = pr.map(mk), bP = mk();
     const put = (b, n, a, z) => { if (!(b.lo[n] <= a)) b.lo[n] = a; if (!(b.hi[n] >= z)) b.hi[n] = z; };
-    const amp = p => Math.SQRT2*Math.hypot(p.r, p.i);
+    const amp = p => Math.SQRT2*(Math.hypot(p.r, p.i) + (p.hh ? p.hh.reduce((a, [, r, i]) => a + Math.hypot(r, i), 0) : 0));   // ยอดโดยประมาณรวมฮาร์มอนิก
     for (let n = 0; n < NC; n++){ const t0 = tA + n*cd, tc = t0 + cd/2; xs.push(tc - tA);
       const nearEv = E && E.tEv < t0 + cd + 1e-9 && E.tEv + 0.02 > t0;
       if (cd >= per/10 && !nearEv && !trv){ const p = at(tc); if (!p) continue;                        // แถบขอบเขตจากเฟเซอร์
@@ -8902,7 +9026,7 @@ function lgDraw(){
   const rmsP = p => Math.sqrt((p.d || 0)**2 + (p.r || 0)**2 + (p.i || 0)**2);
   const Vr = rmsP(pr[0][0]), Ir = pr.map(([, i]) => rmsP(i)), S2 = pr.reduce((a, [v, i]) => a + rmsP(v)*rmsP(i), 0), pf = ac && S2 > 1e-9 ? Math.abs(P)/S2 : null;
   $('#lgname').textContent = (LG.lock ? '📌 ' : '') + (c.n || T[c.t].nm) + ' ';
-  $('#lgval').textContent = `V ${fmt(Vr, 'V')}${ac ? '~' : ''} · I ${three && Math.max(...Ir) - Math.min(...Ir) > 0.01*Math.max(...Ir) ? Ir.map(x => fmt(x, 'A')).join('/') : fmt(Ir[0], 'A') + (three ? ' ×3' : '')}${ac ? '~' : ''} · P ${fmt(Math.abs(P), 'W')}${pf != null ? ' · PF ' + Math.min(1, pf).toFixed(2) : ''}`;
+  $('#lgval').textContent = `V ${fmt(Vr, 'V')}${ac ? '~' : ''} · I ${three && Math.max(...Ir) - Math.min(...Ir) > 0.01*Math.max(...Ir) ? Ir.map(x => fmt(x, 'A')).join('/') : fmt(Ir[0], 'A') + (three ? ' ×3' : '')}${ac ? '~' : ''} · P ${fmt(Math.abs(P), 'W')}${pf != null ? ' · PF ' + Math.min(1, pf).toFixed(2) : ''}${(() => { const ti = thdOf(pr[0][1], pr[0][1].hh), tv = thdOf(pr[0][0], pr[0][0].hh); return ti > 1 ? ' · THDi ' + ti.toFixed(0) + '% THDv ' + tv.toFixed(1) + '%' : ''; })()}`;
   // วาด
   const cv2 = $('#lgcv'), dpr = window.devicePixelRatio || 1, W = cv2.clientWidth, H = cv2.clientHeight; if (!W || !H) return;
   cv2.width = W*dpr; cv2.height = H*dpr; const g = cv2.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
@@ -9477,7 +9601,7 @@ const PAL = [
   ['แหล่งจ่ายไฟ', ['bat','src1','src3','acs','fgen','psu','xfmr','reg','gnd','lbl']],
   ['ป้องกันและเดินสาย', ['mcb','rcd','fuse','ol','cable']],
   ['สวิตช์และปุ่มกด', ['sw','spdt','swint','pb','pbnc','estop','sel3','limit']],
-  ['โหลดไฟฟ้า', ['res','lamp','fluo','cap','ind','capbank','human']],
+  ['โหลดไฟฟ้า', ['res','lamp','fluo','cap','ind','capbank','nl1','nl3','human']],
   ['มอเตอร์', ['motor1','motor3','motor6','dcm','pump','servo']],
   ['ขับเคลื่อนมอเตอร์ (อินเวอร์เตอร์)', ['vfd']],
   ['ควบคุมมอเตอร์ (รีเลย์/คอนแทกเตอร์)', ['coil','tmr','no','nc','k3']],
