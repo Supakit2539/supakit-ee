@@ -1676,7 +1676,7 @@ function solveAll(){
           const iL = sub(R.pv[0], R.pv[2]), iN = sub(R.pv[1], R.pv[3]);
           const IL = {d:GW*iL.d, r:GW*iL.r, i:GW*iL.i}, IN = {d:GW*iN.d, r:GW*iN.r, i:GW*iN.i};
           R.I = rms(IL); R.idiff = rms({d:IL.d + IN.d, r:IL.r + IN.r, i:IL.i + IN.i});
-          const v = sub(R.pv[0], R.pv[1]), p = pw(v, IL); R.V = rms(v); R.P = p.P; R.Q = p.Q;
+          const v = sub(R.pv[0], R.pv[1]), p = pw(v, IL); R.V = rms(v); R.P = p.P; R.Q = p.Q; R.vL = v; R.iL = IL;
           if (c.t === 'rcd' && !c.on) R.I = R.idiff = 0;
         } break;
         case 'ol': R.Ip = [0,1,2].map(k => GW*rms(sub(R.pv[k], R.pv[k + 3]))); break;
@@ -8630,6 +8630,7 @@ const lgNeg = p => ({d:-(p.d || 0), r:-(p.r || 0), i:-(p.i || 0)});
 function lgPairs(c){ const R = RES.comp[c.id]; if (!R) return null;
   if (c.t === 'src1' && R.pv && R.i) return [[sub(R.pv[0], R.pv[1]), lgNeg(R.i[0])]];
   if (c.t === 'src3' && R.pv && R.i) return [0, 1, 2].map(k => [sub(R.pv[k], R.pv[3]), lgNeg(R.i[k])]);
+  if ((c.t === 'pmeter' || c.t === 'rcd') && R.vL && R.iL) return [[R.vL, R.iL]];
   if ((c.t === 'motor3' || c.t === 'motor6') && R.vw && R.iw) return [0, 1, 2].map(k => [R.vw[k], R.iw[k]]);
   if (isTwo(c) && R.v && R.i && !Array.isArray(R.i)) return [[R.v, scIsrc(c) ? lgNeg(R.i) : R.i]];
   return null; }
