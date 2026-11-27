@@ -318,8 +318,8 @@ const path = require('path');
   near('led 21 mA', r.led, 0.021, 0.0005);
   checks.push(['สโคปโพรบกระแส: osc ⊂ RL = กระแส RL (A), ไม่เตือนลอย/พิกัด · rectifier ตามเวลา RL ≈ 144 mA, C1 เฉลี่ย 0 พีคชาร์จ > 1 A คายประจุ ≈ −0.16 A · Math V×A = W',
     r.ip[0] === r.ip[1] && r.ip[0] > 0.1 && r.ip[2] === 'A' && !r.ip[3] && !r.ip[4] && r.ip[5] && Math.abs(r.ip[6] - 0.144) < 0.003 && Math.abs(r.ip[7]) < 0.01 && r.ip[8] > 1 && r.ip[9] < -0.1 && r.ip[9] > -0.25 && r.ip[10] === 'W', JSON.stringify(r.ip)]);
-  checks.push(['ภาระทางกลมอเตอร์: pfc 0% → 4.66 A PF 0.12, 50% → PF 0.44, 100% → 7.16 A PF 0.65 1440 rpm, 150% → 9.76 A รอบตก · dol 220% มอเตอร์ติด เบรกเกอร์ตัด',
-    r.mload[0][0] === 4.66 && r.mload[0][1] === 0.12 && r.mload[1][1] === 0.44 && r.mload[2][0] === 7.16 && r.mload[2][1] === 0.65 && r.mload[2][2] === 1440 && r.mload[3][0] === 9.76 && r.mload[3][2] < 1440 && r.mload[4][0] === 0 && r.mload[4][1], JSON.stringify(r.mload)]);
+  checks.push(['ภาระทางกลมอเตอร์: pfc 0% → 3.15 A PF 0.18, 50% → PF 0.55, 100% → 7.16 A PF 0.65 1440 rpm, 150% → 11.1 A PF ไม่เกิน 0.67 (อิ่มตัว) รอบตก · dol 220% มอเตอร์ติด เบรกเกอร์ตัด',
+    r.mload[0][0] === 3.15 && r.mload[0][1] === 0.18 && r.mload[1][1] === 0.55 && r.mload[2][0] === 7.16 && r.mload[2][1] === 0.65 && r.mload[2][2] === 1440 && r.mload[3][0] === 11.11 && r.mload[3][1] <= 0.67 && r.mload[3][2] < 1440 && r.mload[4][0] === 0 && r.mload[4][1], JSON.stringify(r.mload)]);
   checks.push(['กระแสกระชากสับตัวเก็บประจุ: ที่ยอดแรงดัน ≈ 300–600 A, ที่ศูนย์ < 40 A, รีแอกเตอร์ 200 µH ลดเหลือ < 1/2 · เส้นทาง C1/S1/PM1/แหล่งจ่าย',
     r.inr[0] > 300 && r.inr[0] < 600 && r.inr[1] < 40 && r.inr[2] < r.inr[0]/2 && r.inr[3] === ['C1', 'PM1', 'S1', 'การไฟฟ้า'].sort().join(','), JSON.stringify(r.inr)]);
   checks.push(['dol: K1 ดูด', r.dolCoil === true, r.dolCoil]);
