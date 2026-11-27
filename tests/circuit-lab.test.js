@@ -303,7 +303,13 @@ const path = require('path');
       o.mload.push([m._sp, s.S.comps.filter(c => c.t === 'mcb').some(c => !c.on)]); }
     // กระแสกระชากตอนสับ C1 (pfc): สับที่ยอดแรงดัน (90°) → ยอดหลายร้อย A ≈ Vpk/√(L/C), ที่ศูนย์ (0°) เล็ก, รีแอกเตอร์ 200 µH ลดลง · อุปกรณ์ในเส้นทาง = C1 S1 PM1 แหล่งจ่าย
     { const sw = (deg, lr) => { s.load('pfc'); s.run(2); const C1 = s.find('C1'); C1.lr = lr; INR.fix = deg; s.find('S1').on = true; s.solveNow(); s.run(0.05); return C1._inr ? Math.round(C1._inr.pk) : 0; };
-      o.inr = [sw(90, 0), sw(0, 0), sw(90, 200)]; o.inr.push([...INR.ev.comps.keys()].map(id => s.S.comps.find(x => x.id === id).n).sort().join(','), Math.round(INR.ev.f0)); INR.fix = null; }
+      o.inr = [sw(90, 0), sw(0, 0), sw(90, 200)];
+      // คาปาซิเตอร์แบงก์ 10 kvar 400 V สับด้วย MCB 3 ตัวพร้อมกัน → กระแสสายกระชาก ≈ 1 kA สั่น ≈ 3 kHz, รีแอกเตอร์ 100 µH/เฟส ลดลง
+      const cbSw = lr => { s.load(build((C, W) => { const sc = C('src3', 4, 1, {n:'การไฟฟ้า'}), p = pinsOf(sc), cb = C('capbank', 4, 9, {n:'CB1', kvar:10, lr}), q = pinsOf(cb);
+          [0, 1, 2].forEach(k => { const x = p[k][0]; C('mcb', x, 5, {r:1, n:'Q' + (k + 1), In:63, on:false}); W([x, p[k][1]], [x, 4]); W([x, 6], [x, q[k][1]]); }); }));
+        s.run(1); INR.fix = 90; ['Q1', 'Q2', 'Q3'].forEach(n => s.find(n).on = true); s.solveNow(); s.run(0.05); const cb = s.find('CB1');
+        sel = {k:'c', c:s.find('การไฟฟ้า')}; LG.on = true; LG.lock = null; lgDraw(); return [Math.round(cb._inr.pk), Math.round(cb._inr.f0), !!LG.evlab]; };
+ o.inr.push([...INR.ev.comps.keys()].map(id => s.S.comps.find(x => x.id === id).n).sort().join(','), Math.round(INR.ev.f0)); o.cbinr = [cbSw(0), cbSw(100)]; INR.fix = null; }
     s.load('arduino'); s.run(1.2); o.pwmSw = scopeSwitchers().map(x => [x.f, Math.round(x.duty*100)/100]);
 
     o.mcuErr = ['arduino','esp32','pico','ardsense','espgarden','counter','motor'].map(k => (s.load(k), s.run(0.3), s.find('U1')._vm.err)).filter(Boolean);
@@ -320,6 +326,8 @@ const path = require('path');
     r.ip[0] === r.ip[1] && r.ip[0] > 0.1 && r.ip[2] === 'A' && !r.ip[3] && !r.ip[4] && r.ip[5] && Math.abs(r.ip[6] - 0.144) < 0.003 && Math.abs(r.ip[7]) < 0.01 && r.ip[8] > 1 && r.ip[9] < -0.1 && r.ip[9] > -0.25 && r.ip[10] === 'W', JSON.stringify(r.ip)]);
   checks.push(['ภาระทางกลมอเตอร์: pfc 0% → 3.15 A PF 0.18, 50% → PF 0.55, 100% → 7.16 A PF 0.65 1440 rpm, 150% → 11.1 A PF ไม่เกิน 0.67 (อิ่มตัว) รอบตก · dol 220% มอเตอร์ติด เบรกเกอร์ตัด',
     r.mload[0][0] === 3.15 && r.mload[0][1] === 0.18 && r.mload[1][1] === 0.55 && r.mload[2][0] === 7.16 && r.mload[2][1] === 0.65 && r.mload[2][2] === 1440 && r.mload[3][0] === 11.11 && r.mload[3][1] <= 0.67 && r.mload[3][2] < 1440 && r.mload[4][0] === 0 && r.mload[4][1], JSON.stringify(r.mload)]);
+  checks.push(['กระแสกระชากคาปาซิเตอร์แบงก์ 3 เฟส 10 kvar: ยอดกระแสสาย 0.7–1.4 kA สั่น 2.5–3.5 kHz แหล่งจ่ายเห็นภาพตอนสับ · รีแอกเตอร์ 100 µH/เฟส ลด < 1/2',
+    r.cbinr[0][0] > 700 && r.cbinr[0][0] < 1400 && r.cbinr[0][1] > 2500 && r.cbinr[0][1] < 3500 && r.cbinr[0][2] && r.cbinr[1][0] < r.cbinr[0][0]/2, JSON.stringify(r.cbinr)]);
   checks.push(['กระแสกระชากสับตัวเก็บประจุ: ที่ยอดแรงดัน ≈ 300–600 A, ที่ศูนย์ < 40 A, รีแอกเตอร์ 200 µH ลดเหลือ < 1/2 · เส้นทาง C1/S1/PM1/แหล่งจ่าย',
     r.inr[0] > 300 && r.inr[0] < 600 && r.inr[1] < 40 && r.inr[2] < r.inr[0]/2 && r.inr[3] === ['C1', 'PM1', 'S1', 'การไฟฟ้า'].sort().join(','), JSON.stringify(r.inr)]);
   checks.push(['dol: K1 ดูด', r.dolCoil === true, r.dolCoil]);

@@ -1692,7 +1692,9 @@ function solveAll(){
           if (c.t === 'rcd' && !c.on) R.I = R.idiff = 0;
         } break;
         case 'ol': R.Ip = [0,1,2].map(k => GW*rms(sub(R.pv[k], R.pv[k + 3]))); break;
-        case 'capbank': { const Cp = c.kvar*1000/3/(w*c.V*c.V); let Q = 0; R.Il = [];
+        case 'capbank': { const Cp = c.kvar*1000/3/(w*c.V*c.V); let Q = 0; R.Il = []; R.Cp = Cp;
+          R.vLL = [0, 1, 2].map(k => sub(R.pv[k], R.pv[(k + 1)%3])); R.iLeg = R.vLL.map(v => ({d:0, r:-w*Cp*(v.i || 0), i:w*Cp*(v.r || 0)}));   // i = jωC·v
+          R.iL = [0, 1, 2].map(k => sub(R.iLeg[k], R.iLeg[(k + 2)%3]));
           for (let k = 0; k < 3; k++){ const v = acm(sub(R.pv[k], R.pv[(k + 1)%3])); Q += w*Cp*v*v; }
           R.Q = -Q; R.I = Q/(SQ3*Math.max(1, acm(sub(R.pv[0], R.pv[1])))); } break;
         case 'reg': R.vin = R.pv[0].d - R.pv[1].d; R.vout = R.pv[2].d - R.pv[1].d; R.iout = -xd[j]; break;
@@ -5652,7 +5654,7 @@ const F = {
   ol:[NMF,['Ir','กระแสที่ตั้ง (Ir)','num','A'],['cls','คลาสการตัด','num','']],
   motor6:[NMF,['V','แรงดันพิกัด (Δ)','num','V'],['P','กำลังเพลา','num','kW'],['load','ภาระทางกล (% แรงบิดพิกัด)','num','%'],['pf','ตัวประกอบกำลัง','num',''],['eff','ประสิทธิภาพ','num',''],['Ist','กระแสสตาร์ท (× In)','num','']],
   cable:[NMF,['A','ขนาดหน้าตัด','sel',Object.fromEntries(Object.keys(CABLE).map(k => [k, k + ' mm²']))],['len','ความยาว','num','m'],['mat','ตัวนำ','sel',{Cu:'ทองแดง',Al:'อะลูมิเนียม'}]],
-  capbank:[NMF,['kvar','ขนาด','num','kvar'],['V','แรงดัน','num','V']],
+  capbank:[NMF,['kvar','ขนาด','num','kvar'],['V','แรงดัน','num','V'],['lr','รีแอกเตอร์จำกัดกระแสกระชาก (ต่อเฟส)','num','µH']],
   pmeter:[NMF],
   scope:[NMF,['earth','กราวด์โพรบ','bool','ต่อสายดิน (เครื่องตั้งโต๊ะ)']],
   dcm:[NMF,['V','แรงดันพิกัด','num','V'],['R','ความต้านทานขดลวด','num','Ω']],
@@ -5959,7 +5961,9 @@ function compHTML(c){
     case 'motor6': ['U1–U2','V1–V2','W1–W2'].forEach((nm, k) => add('กระแสขด ' + nm, fmt(R.ph[k], 'A')));
       add('แรงดันขดลวด', R.Vw.map(v => v.toFixed(0)).join(' / ') + ' V'); add('กำลังไฟฟ้า', fmt(R.P, 'W')); add('ความเร็ว', ((c._sp||0)*100).toFixed(0) + '%');
       st.push(c._hum ? tag('bad','ขาดเฟส — คราง') : c._run ? tag('ok', 'หมุน ต่อแบบ ' + (c._cn === 'Y' ? 'สตาร์ (Y)' : 'เดลต้า (Δ)')) : tag('warn','หยุด')); break;
-    case 'capbank': add('กำลังรีแอกทีฟ', fmt(-R.Q, 'var')); add('กระแสสาย', fmt(R.I, 'A')); break;
+    case 'capbank': add('กำลังรีแอกทีฟ', fmt(-R.Q, 'var')); add('กระแสสาย', fmt(R.I, 'A'));
+      if (c._inr){ add('กระแสกระชากล่าสุด', fmt(c._inr.pk, 'A') + ' (' + c._inr.x + '× ของยอดปกติ) · สั่น ' + fmt(c._inr.f0, 'Hz'));
+        st.push(c._inr.x > 100 ? tag('bad', 'กระแสกระชากเกิน 100 เท่า — ใช้คอนแทกเตอร์สำหรับคาปาซิเตอร์ (มีตัวต้านทานหน่วง) หรือรีแอกเตอร์ (lr)') : tag('ok', 'กระแสกระชากอยู่ในเกณฑ์')); } break;
     case 'swint': add('ตำแหน่ง', c.pos === 'X' ? 'ไขว้ (1–4, 2–3)' : 'ตรง (1–3, 2–4)'); break;
     case 'sel3': add('ตำแหน่ง', {'1':'1 (MAN)','0':'0 (OFF)','2':'2 (AUTO)'}[c.pos]); break;
     case 'npn': case 'pnp': st.push({off:tag('warn','หยุดนำ (cut-off)'), act:tag('ok','ย่านขยาย (active)'), sat:tag('ok','อิ่มตัว (สวิตช์ปิด)')}[c._bj || 'off']);
@@ -8670,7 +8674,21 @@ function capInrush(){
       if (sim(ix, Ic)) comps.set(o.id, {s:1, ser:true}); else if (sim(ix, lgNeg(Ic))) comps.set(o.id, {s:-1, ser:true});
       else if (['src1', 'acs', 'pmeter', 'rcd'].includes(o.t)){ const d1 = Math.hypot(ix.r - Ic.r, ix.i - Ic.i), d2 = Math.hypot(ix.r + Ic.r, ix.i + Ic.i); comps.set(o.id, {s:d1 < d2 ? 1 : -1, ser:false}); } }
     c._inr = {pk, t:simT, v0:vss0, f0:wd/(2*Math.PI), x:+(pk/Math.max(1e-9, Math.SQRT2*Math.hypot(Ic.r, Ic.i))).toFixed(0)};
-    INR.ev = {c, th, w, itr, vtr, comps, wall:performance.now(), pk, f0:wd/(2*Math.PI)};
+    INR.ev = {c, th, w, tr:[itr], vtr:[vtr], Ic:[Ic], comps, wall:performance.now(), pk, f0:wd/(2*Math.PI)};
+  }
+  // คาปาซิเตอร์แบงก์ 3 เฟส (เดลต้า): คอนแทกเตอร์ 3 ขั้วสับพร้อมกัน → แต่ละขา (Lk–Lk+1) เป็น LC กับความเหนี่ยวนำ 2 สาย · กระแสสาย = ขา k − ขา k−1
+  for (const c of S.comps){ if (c.t !== 'capbank') continue; const R = RES.comp[c.id]; if (!R || !R.vLL) continue;
+    const mag = Math.hypot(R.vLL[0].r || 0, R.vLL[0].i || 0), was = c._vmag; c._vmag = mag;
+    if (was === undefined || was > 1 || mag < 20 || Math.abs(mag - c.V) > 0.15*c.V) continue;
+    const C = R.Cp, L = 2*(INR.Ls + (+c.lr || 0)*1e-6), Rr = 2*INR.R, al = Rr/(2*L), w0 = 1/Math.sqrt(L*C), wd = Math.sqrt(Math.max(1, w0*w0 - al*al));
+    const th = INR.fix != null ? INR.fix*Math.PI/180 : Math.random()*2*Math.PI;
+    const leg = [0, 1, 2].map(k => { const vss0 = lgAt(R.vLL[k], w, th/w), iss0 = lgAt(R.iLeg[k], w, th/w), A = -vss0, B = (-iss0/C + al*A)/wd;
+      return t => t < 0 ? 0 : C*Math.exp(-al*t)*((-al*A + wd*B)*Math.cos(wd*t) + (-al*B - wd*A)*Math.sin(wd*t)); });
+    const tr = [0, 1, 2].map(k => (t => leg[k](t) - leg[(k + 2)%3](t)));
+    let pk = 0; for (let n = 0; n <= 600; n++){ const t = n/600*Math.min(5e-3, 6/al); for (let k = 0; k < 3; k++){ const v = Math.abs(lgAt(R.iL[k], w, th/w + t) + tr[k](t)); if (v > pk) pk = v; } }
+    const comps = new Map([[c.id, {s:1, ser:true}]]); for (const o of S.comps) if (o.t === 'src3') comps.set(o.id, {s:1, ser:false});
+    c._inr = {pk, t:simT, f0:wd/(2*Math.PI), x:+(pk/Math.max(1e-9, Math.SQRT2*R.I)).toFixed(0)};
+    INR.ev = {c, th, w, tr, vtr:null, Ic:R.iL, comps, wall:performance.now(), pk, f0:wd/(2*Math.PI)};
   }
 }
 /* ---------- กราฟสด (#lgraph): แรงดัน กระแส กำลัง ของอุปกรณ์ที่เลือก ซ้อนในกราฟเดียว ----------
@@ -8684,6 +8702,7 @@ function lgPairs(c){ const R = RES.comp[c.id]; if (!R) return null;
   if (c.t === 'src1' && R.pv && R.i) return [[sub(R.pv[0], R.pv[1]), lgNeg(R.i[0])]];
   if (c.t === 'src3' && R.pv && R.i) return [0, 1, 2].map(k => [sub(R.pv[k], R.pv[3]), lgNeg(R.i[k])]);
   if ((c.t === 'pmeter' || c.t === 'rcd') && R.vL && R.iL) return [[R.vL, R.iL]];
+  if (c.t === 'capbank' && R.iL && R.pv) return [0, 1, 2].map(k => [R.pv[k], R.iL[k]]);
   if ((c.t === 'motor3' || c.t === 'motor6') && R.vw && R.iw) return [0, 1, 2].map(k => [R.vw[k], R.iw[k]]);
   if (isTwo(c) && R.v && R.i && !Array.isArray(R.i)) return [[R.v, scIsrc(c) ? lgNeg(R.i) : R.i]];
   return null; }
@@ -8706,15 +8725,16 @@ function lgDraw(){
   // สัญญาณตามเวลา
   let Tw, xs = [], tr = [];
   const N = 240, ev = INR.ev && performance.now() - INR.ev.wall < 6000 && INR.ev.comps.get(c.id);
-  if (ac && ev && pr.length === 1){
-    // จับภาพตอนสับ: −2 ms ถึง +8 ms รอบจุดสับ (ละเอียดพอเห็นการสั่นความถี่สูง)
-    const E = INR.ev, Ic = RES.comp[E.c.id].i, [v, i] = pr[0], M = 1200; Tw = 0.01; const tb = -0.002;
-    const pre = ev.ser ? null : {d:(i.d || 0) - ev.s*(Ic.d || 0), r:(i.r || 0) - ev.s*(Ic.r || 0), i:(i.i || 0) - ev.s*(Ic.i || 0)};
+  if (ac && ev && pr.length === INR.ev.tr.length){
+    // จับภาพตอนสับ: −2 ms ถึง +8 ms รอบจุดสับ (ละเอียดพอเห็นการสั่นความถี่สูง) · 1 เฟส หรือ 3 เฟส (กระแสสาย L1 L2 L3)
+    const E = INR.ev, M = 1200; Tw = 0.01; const tb = -0.002, isC = c === E.c;
     for (let n = 0; n <= M; n++) xs.push(n/M*Tw);
     const tt = x => E.th/w + tb + x, rel = x => tb + x;
-    const V = xs.map(x => c === E.c ? (rel(x) < 0 ? 0 : lgAt(v, w, tt(x)) + E.vtr(rel(x))) : lgAt(v, w, tt(x)));
-    const I = xs.map(x => rel(x) < 0 ? (pre ? lgAt(pre, w, tt(x)) : 0) : lgAt(i, w, tt(x)) + ev.s*E.itr(rel(x)));
-    tr = [{u:'V', nm:'V', col:LG_COL.V, y:V}, {u:'A', nm:'I', col:LG_COL.I[0], y:I}, {u:'W', nm:'P', col:LG_COL.P, y:V.map((a, k) => a*I[k])}];
+    const Vs = pr.map(([v], k) => xs.map(x => isC && rel(x) < 0 ? 0 : lgAt(v, w, tt(x)) + (isC && E.vtr ? E.vtr[k](rel(x)) : 0)));
+    const Is = pr.map(([, i], k) => { const Ic = E.Ic[k], pre = ev.ser ? null : {d:(i.d || 0) - ev.s*(Ic.d || 0), r:(i.r || 0) - ev.s*(Ic.r || 0), i:(i.i || 0) - ev.s*(Ic.i || 0)};
+      return xs.map(x => rel(x) < 0 ? (pre ? lgAt(pre, w, tt(x)) : 0) : lgAt(i, w, tt(x)) + ev.s*E.tr[k](rel(x))); });
+    tr = [{u:'V', nm:three ? 'V (L1)' : 'V', col:LG_COL.V, y:Vs[0]}, ...Is.map((I, k) => ({u:'A', nm:three ? 'I L' + (k + 1) : 'I', col:LG_COL.I[k], y:I})),
+      {u:'W', nm:three ? 'P รวม' : 'P', col:LG_COL.P, y:xs.map((x, n) => Vs.reduce((a, V, k) => a + V[n]*Is[k][n], 0))}];
     LG.evlab = `⚡ สับ ${E.c.n} ที่มุม ${Math.round(E.th*180/Math.PI)}° · กระชากยอด ${fmt(E.pk, 'A')} · สั่น ${fmt(E.f0, 'Hz')}`; LG.ev0 = -tb; }
   else if (ac){ LG.evlab = null; Tw = 2/f; const v0 = pr[0][0], t0 = -Math.atan2(v0.i || 0, v0.r || 0)/w;                               // ทริก: แรงดันตัดศูนย์ขาขึ้น
     const trv = RES.trans && TR.tw && isTwo(c) && c._n ? (() => { const fi = trCurAt(c, simT); if (fi == null) return null; const tE = TR.tw.tEnd;
@@ -8727,7 +8747,8 @@ function lgDraw(){
   else { LG.evlab = null; const h = LG.h; Tw = 10; const tE = h.length ? h[h.length - 1][0] : simT; xs = h.map(e => e[0] - (tE - Tw));
     tr = [{u:'V', nm:'V', col:LG_COL.V, y:h.map(e => e[1])}, {u:'A', nm:'I', col:LG_COL.I[0], y:h.map(e => e[2])}, {u:'W', nm:'P', col:LG_COL.P, y:h.map(e => e[3])}]; }
   // ค่าอ่าน
-  const P = R.P != null ? (scIsrc(c) || c.t === 'src3' ? -R.P : R.P) : tr[tr.length - 1].y.reduce((a, b) => a + b, 0)/Math.max(1, tr[tr.length - 1].y.length);
+  const P = R.P != null ? (scIsrc(c) || c.t === 'src3' ? -R.P : R.P) : ac ? pr.reduce((a, [v, i]) => a + (v.d || 0)*(i.d || 0) + (v.r || 0)*(i.r || 0) + (v.i || 0)*(i.i || 0), 0)
+    : tr[tr.length - 1].y.reduce((a, b) => a + b, 0)/Math.max(1, tr[tr.length - 1].y.length);
   const rmsP = p => Math.sqrt((p.d || 0)**2 + (p.r || 0)**2 + (p.i || 0)**2);
   const Vr = rmsP(pr[0][0]), Ir = pr.map(([, i]) => rmsP(i)), S2 = pr.reduce((a, [v, i]) => a + rmsP(v)*rmsP(i), 0), pf = ac && S2 > 1e-9 ? Math.abs(P)/S2 : null;
   $('#lgname').textContent = (LG.lock ? '📌 ' : '') + (c.n || T[c.t].nm) + ' ';
