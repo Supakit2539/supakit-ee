@@ -421,7 +421,7 @@ button,select,.pi,summary{touch-action:manipulation}
 <script>
 'use strict';
 // รุ่นของแอป (เพิ่มทุกครั้งที่ปล่อยของใหม่) — แสดงท้ายเมนู ⋯ และเมนูไฟล์ เพื่อเช็กว่าโทรศัพท์โหลดรุ่นล่าสุดแล้ว
-const APP_VER = '2026.11.28-2';
+const APP_VER = '2026.11.28-3';
 /* ============================================================
    1. ค่าคงที่และชนิดอุปกรณ์
    ============================================================ */
@@ -794,6 +794,8 @@ T.motor6 = {nm:'มอเตอร์ 3 เฟส 6 ขั้ว (สตาร�
             pins:[[-1,-1,'U1'],[0,-1,'V1'],[1,-1,'W1'],[-1,1,'U2'],[0,1,'V2'],[1,1,'W2']], box:[-1.6,-1,1.6,1]};
 T.cable  = {nm:'สายไฟ (ตามขนาด mm²)',          ic:'═', pre:'W', d:{A:2.5, len:20, mat:'Cu'}};
 T.capbank= {nm:'คาปาซิเตอร์แบงก์ 3 เฟส',        ic:'⫴', pre:'C', d:{kvar:5, V:400}, pins:[[-1,-1,'L1'],[0,-1,'L2'],[1,-1,'L3']], box:[-1.6,-1,1.6,1]};
+T.pfcr = {nm:'ตัวควบคุม PF อัตโนมัติ', ic:'PF', pre:'PFC', d:{meas:'การไฟฟ้า', pft:0.95, steps:'2.5,5,5,10', delay:3, dis:10, auto:true},
+  pins:[[-2,-1,'L'],[2,-1,'C'],[-2,1,'N'],[-1,1,'Q1'],[0,1,'Q2'],[1,1,'Q3'],[2,1,'Q4']], box:[-2.6,-1,2.6,1]};
 T.scope  = {nm:'ออสซิลโลสโคป 2 แชนเนล',       ic:'∿', pre:'OSC', d:{vdiv1:5, vdiv2:5, tdiv:0.005, pos1:1.5, pos2:-2.5, cpl1:'DC', cpl2:'DC', on2:true, trig:'1', slope:'up', tlev:0, earth:true, run:true, disp:'yt', fftch:'1', fspan:'auto', fref:30,
               math:'off', vdivm:5, posm:0, cur:'off', cch:'1', ta:3, tb:7, va:2, vb:-2, px1:1, px2:1, tmode:'auto'},
             pins:[[-1,2,'CH1'],[0,2,'CH2'],[2,2,'⏚']], box:[-2.6,-2,2.6,2]};
@@ -1497,6 +1499,7 @@ function solveAll(){
           for (let k = 0; k < 3; k++) Y(n[k], n[k + 3], y6[0], y6[1]); } break;
         case 'rcd': Y(n[0], n[2], c.on ? GW : GOFF, 0); Y(n[1], n[3], c.on ? GW : GOFF, 0); break;
         case 'pmeter': Y(n[0], n[2], GW, 0); Y(n[1], n[3], GW, 0); break;
+        case 'pfcr': { const st = c._st || []; for (let k = 0; k < 4; k++) Y(n[1], n[3 + k], st[k] && c._pw ? GW : GOFF, 0); Y(n[0], n[2], 5/(230*230), 0); } break;
         case 'swint': { const x = c.pos === 'X'; Y(n[0], n[x ? 3 : 2], GW, 0); Y(n[1], n[x ? 2 : 3], GW, 0); Y(n[0], n[x ? 2 : 3], GOFF, 0); Y(n[1], n[x ? 3 : 2], GOFF, 0); } break;
         case 'sel3': Y(n[0], n[1], c.pos === '1' ? GW : GOFF, 0); Y(n[0], n[2], c.pos === '2' ? GW : GOFF, 0); break;
         case 'ol': for (let k = 0; k < 3; k++) Y(n[k], n[k + 3], GW, 0); Y(n[6], n[7], c._trip ? GOFF : GW, 0); break;
@@ -2138,8 +2141,37 @@ function trip(c){
   if (c.t === 'mcb'){ c.on = false; c._trip = true; } else c._blown = true;
   c._h = 0; needSolve = true;
 }
+/* ตัวควบคุม PF อัตโนมัติ (pfcr): วัด P, Q ที่จ่ายจากแหล่ง/มิเตอร์ (meas) → Q ส่วนเกิน = Q − P·tan(acos PF เป้าหมาย)
+   ขาด (เหนี่ยวนำ) > 60% ของสเต็ปถัดไป → สับสเต็ปที่ยังปิด (ต้องคายประจุครบ dis s ก่อนสับซ้ำ), เกิน (นำหน้า) → ปลดสเต็ป · ห่างกันอย่างน้อย delay s
+   รีเลย์ C–Q1..Q4 ไปขดคอนแทกเตอร์ของแต่ละสเต็ป · ทำงานเมื่อไฟเลี้ยง L–N ≥ 180 V */
+function pfcPQ(c){ const m = S.comps.find(o => o.n === c.meas && ['src1', 'src3', 'pmeter', 'rcd'].includes(o.t)); if (!m) return null; const R = RES.comp[m.id]; if (!R || R.P == null) return null;
+  return {P:R.P, Q:R.Q}; }                                                                   // แหล่งจ่าย/มิเตอร์: บวก = จ่ายให้โหลด
+function pfcTick(c, dt){
+  const R = RES.comp[c.id] || {}, vs = R.pv ? rms(sub(R.pv[0], R.pv[2])) : 0; c._pw = vs >= 180;
+  const st = c._st || (c._st = [false, false, false, false]), off = c._off || (c._off = [-1e9, -1e9, -1e9, -1e9]);
+  const sz = String(c.steps || '').split(/[ ,]+/).map(Number).slice(0, 4); while (sz.length < 4) sz.push(0);
+  const pq = pfcPQ(c); c._pf = null; if (!pq) return;
+  const S2 = Math.hypot(pq.P, pq.Q); c._pf = S2 > 50 ? pq.P/S2 : null; c._q = pq.Q; c._p = pq.P;
+  if (!c._pw){ for (let k = 0; k < 4; k++) if (st[k]){ st[k] = false; off[k] = simT; needSolve = true; } return; }
+  if (c.auto === false || dt <= 0) return;
+  const tg = Math.min(1, Math.max(0.5, +c.pft || 0.95)), ex = (pq.Q - Math.max(0, pq.P)*Math.tan(Math.acos(tg)))/1000;   // kvar ที่ยังขาด (+) / เกิน (−)
+  // เลือกชุดสเต็ป (จาก 16 แบบ) ที่ได้ kvar ใกล้เป้าที่สุด (เกินเป้า = นำหน้า คิดโทษมากกว่า) · สเต็ปที่จะสับเพิ่มต้องคายประจุครบแล้ว
+  const ready = k => st[k] || (sz[k] > 0 && simT - off[k] >= (+c.dis || 0)), on = sz.reduce((a, q, k) => a + (st[k] ? q : 0), 0), tgt = on + ex;
+  // ต่ำกว่าเป้า = ขาดเท่าไรเสียเท่านั้น · เกินจนนำหน้า (เกิน Q ของโหลดทั้งหมด) เสีย 2 เท่า · ระหว่างนั้นไม่เสีย (PF ≥ เป้า และยังล้าหลัง)
+  const qmax = on + pq.Q/1000, cost = q => Math.max(0, tgt - q) + 2*Math.max(0, q - qmax), cur = st.reduce((a, v, k) => a | (v ? 1 << k : 0), 0);
+  const ham = m => { let n = 0; for (let k = 0; k < 4; k++) if ((m ^ cur) >> k & 1) n++; return n; };
+  let best = null, bc = 0;
+  for (let m = 0; m < 16; m++){ let q = 0, ok = true; for (let k = 0; k < 4; k++) if (m >> k & 1){ if (!ready(k)){ ok = false; break; } q += sz[k]; } const cc = cost(q) + 0.05*ham(m); if (ok && (best == null || cc < bc - 1e-9)){ best = m; bc = cc; } }
+  const smin = Math.min(...sz.filter(q => q > 0)), want = best != null && best !== cur && cost(on) - bc > 0.3*smin;
+  // ต้องต้องการเปลี่ยนต่อเนื่องนาน delay s (ไม่ตอบสนองกระแสสตาร์ทมอเตอร์ชั่วครู่) · เปลี่ยนทีละสเต็ป: สับเพิ่มก่อน แล้วค่อยปลด
+  c._nu = want ? (c._nu || 0) + dt : 0; if (!want || c._nu < (+c.delay || 0)) return;
+  let k = -1; for (let q = 0; q < 4; q++) if ((best >> q & 1) && !st[q] && (k < 0 || sz[q] > sz[k])) k = q;
+  if (k >= 0) st[k] = true; else { for (let q = 0; q < 4; q++) if (!(best >> q & 1) && st[q] && (k < 0 || sz[q] > sz[k])) k = q; if (k >= 0){ st[k] = false; off[k] = simT; } }
+  c._nu = 0; needSolve = true;
+}
 function discrete(dt){
   byName = nameMap();
+  for (const c of S.comps) if (c.t === 'pfcr') pfcTick(c, dt);
   for (const c of S.comps){
     if (MCU[c.t]){ if (dt > 0) runVm(c, dt); wifiUpkeep(c); continue; }
     if (c.t === 'term'){ termTick(c); continue; }
@@ -4327,6 +4359,26 @@ void loop() {
     C('sw', 12, 12, {r:1, n:'แตะสายไฟ', on:false}); W([12,10],[12,11]);
     C('human', 12, 15, {r:1, n:'คน', model:'normal'}); W([12,13],[12,14]); C('gnd', 12, 16, {});
   })},
+  pfcauto: {nm:'ตู้ PFC 3 เฟสอัตโนมัติ 4 สเต็ป (หม้อแปลง 160 kVA)', f:() => build((C,W) => {
+    C('src3', 2, 1, {n:'การไฟฟ้า', model:'tr160', kva:160, zpct:4, xr:3});
+    // บัสบาร์ L1 L2 L3 (y = 3, 4, 5) · N ลงไปเป็นสายกลับของวงจรควบคุม (y = 28)
+    W([1,2],[1,3]); W([2,2],[2,4]); W([3,2],[3,5]); W([1,3],[42,3]); W([2,4],[38,4]); W([3,5],[38,5]);
+    W([4,2],[4,28]); W([4,28],[40,28]);
+    // โหลดมอเตอร์: M1, M2 ต่อตรง · M3 ผ่านคอนแทกเตอร์ K10 (สวิตช์ S1)
+    const feed = (X, y2) => { W([X-1,3],[X-1,y2]); W([X,4],[X,y2]); W([X+1,5],[X+1,y2]); };
+    feed(8, 12); C('motor3', 8, 13, {n:'M1', P:7.5, pf:0.82, eff:0.89, Ist:6, load:100});
+    feed(12, 12); C('motor3', 12, 13, {n:'M2', P:11, pf:0.84, eff:0.9, Ist:6, load:80});
+    feed(16, 9); C('k3', 16, 10, {ref:'K10', In:18}); W([15,11],[15,12]); W([16,11],[16,12]); W([17,11],[17,12]); C('motor3', 16, 13, {n:'M3', P:5.5, pf:0.8, eff:0.88, Ist:6, load:100});
+    // คาปาซิเตอร์แบงก์ 4 สเต็ป ผ่านคอนแทกเตอร์ K1–K4
+    [[22, 2.5], [26, 5], [30, 5], [34, 10]].forEach(([X, q], k) => { feed(X, 9); C('k3', X, 10, {ref:'K' + (k + 1), In:18});
+      W([X-1,11],[X-1,12]); W([X,11],[X,12]); W([X+1,11],[X+1,12]); C('capbank', X, 13, {n:'CB' + (k + 1), kvar:q, V:400}); });
+    // วงจรควบคุม 230 V: L1 → แถว y = 17
+    W([42,3],[42,17]); W([11,17],[42,17]);
+    C('sw', 12, 20, {n:'S1', on:false}); W([11,17],[11,20]); C('coil', 15, 20, {n:'K10'}); W([13,20],[14,20]); W([16,20],[16,28]);
+    C('pfcr', 24, 19, {n:'PFC1', meas:'การไฟฟ้า', pft:0.95, steps:'2.5,5,5,10', delay:3, dis:10});
+    W([22,17],[22,18]); W([26,17],[26,18]); W([22,20],[22,28]);
+    [[23, 21, 28], [24, 22, 31], [25, 23, 34], [26, 24, 37]].forEach(([qx, y, cx], k) => { W([qx,20],[qx,y],[cx,y],[cx,25]); C('coil', cx, 26, {r:1, n:'K' + (k + 1)}); W([cx,27],[cx,28]); });
+  })},
   pfc: {nm:'แก้ค่าตัวประกอบกำลัง (PF) ของมอเตอร์', f:() => build((C,W) => {
     C('src1', 2, 1, {n:'การไฟฟ้า', model:'th230'});
     C('pmeter', 3, 5, {n:'PM1'}); W([2,2],[2,4]); W([3,2],[3,3],[4,3],[4,4]);
@@ -5107,6 +5159,12 @@ function drawBlock(c, ghost){
       text('Δ ' + fmt(c.IdN, 'A'), X, Y - 14, 9, K.text, 'center', '600', true);
       text(on ? 'ON' : (c._trip === 'rcd' ? 'ตัดไฟรั่ว!' : c._trip ? 'ทริป' : 'OFF'), X, Y + 14, 9, on ? K.ok : K.bad, 'center', '600');
     } break;
+    case 'pfcr': {
+      ctx.fillStyle = '#0b1220'; rrect(X - 56, Y - 26, 112, 34, 3); ctx.fill();
+      text(c._pw ? (c._pf != null ? 'PF ' + Math.abs(c._pf).toFixed(2) + (c._q < 0 ? ' นำ' : '') : 'PF —') : 'OFF', X - 22, Y - 13, 11, c._pw ? '#86efac' : '#64748b', 'center', '600', true);
+      text('→ ' + (+c.pft || 0.95).toFixed(2), X + 30, Y - 13, 9, '#94a3b8', 'center', '500', true);
+      for (let k = 0; k < 4; k++){ ctx.fillStyle = c._st && c._st[k] && c._pw ? '#f59e0b' : '#334155'; ctx.beginPath(); ctx.arc(X - 33 + k*22, Y + 1, 5, 0, 7); ctx.fill(); text(String(k + 1), X - 33 + k*22 + 9, Y + 1, 8, '#94a3b8', 'left', '500', true); }
+    } break;
     case 'pmeter': {
       const R = RES.comp[c.id] || {}; ctx.fillStyle = '#0b1220'; rrect(X - 34, Y - 22, 68, 44, 3); ctx.fill();
       text(fmt(R.P, 'W'), X, Y - 11, 11, '#86efac', 'center', '600', true); text(fmt(R.I, 'A'), X, Y + 2, 9, '#e2e8f0', 'center', '500', true);
@@ -5669,6 +5727,7 @@ const F = {
   ol:[NMF,['Ir','กระแสที่ตั้ง (Ir)','num','A'],['cls','คลาสการตัด','num','']],
   motor6:[NMF,['V','แรงดันพิกัด (Δ)','num','V'],['P','กำลังเพลา','num','kW'],['load','ภาระทางกล (% แรงบิดพิกัด)','num','%'],['pf','ตัวประกอบกำลัง','num',''],['eff','ประสิทธิภาพ','num',''],['Ist','กระแสสตาร์ท (× In)','num','']],
   cable:[NMF,['A','ขนาดหน้าตัด','sel',Object.fromEntries(Object.keys(CABLE).map(k => [k, k + ' mm²']))],['len','ความยาว','num','m'],['mat','ตัวนำ','sel',{Cu:'ทองแดง',Al:'อะลูมิเนียม'}]],
+  pfcr:[NMF,['meas','วัดที่ (ชื่อแหล่งจ่าย/มิเตอร์)','txt'],['pft','PF เป้าหมาย','num',''],['steps','ขนาดสเต็ป Q1–Q4','txt','kvar'],['delay','หน่วงระหว่างสับ','num','s'],['dis','เวลาคายประจุก่อนสับซ้ำ','num','s'],['auto','ทำงานอัตโนมัติ','bool','อัตโนมัติ']],
   capbank:[NMF,['kvar','ขนาด','num','kvar'],['V','แรงดัน','num','V'],['lr','รีแอกเตอร์จำกัดกระแสกระชาก (ต่อเฟส)','num','µH']],
   pmeter:[NMF],
   scope:[NMF,['earth','กราวด์โพรบ','bool','ต่อสายดิน (เครื่องตั้งโต๊ะ)']],
@@ -5772,6 +5831,7 @@ const NOTES = {
   ol:'โอเวอร์โหลดรีเลย์แบบความร้อน: ต่ออนุกรมกับสายมอเตอร์ ตั้ง Ir = กระแสพิกัดมอเตอร์ · เมื่อกระแสเกินนาน หรือเฟสขาด หน้าสัมผัส 95–96 (NC) จะเปิด ต้องต่ออนุกรมในวงจรคอยล์คอนแทกเตอร์ · คลิกเพื่อรีเซ็ต',
   motor6:'มอเตอร์ 3 เฟสที่นำปลายขดลวดออกมา 6 ขั้ว (U1–U2, V1–V2, W1–W2) · ต่อสตาร์ (U2-V2-W2 รวมกัน) ขดลวดรับ 230 V กระแสสตาร์ทเหลือ 1/3 · ต่อเดลต้า (U1–W2, V1–U2, W1–V2) ขดลวดรับ 400 V ทำงานเต็มกำลัง',
   cable:'สายไฟมีความต้านทาน R = ρL/A ทำให้แรงดันตกและร้อน · เลือกขนาดสายให้ทนกระแสได้มากกว่าพิกัดเบรกเกอร์ (เช่น C16 ใช้ 2.5 mm², C32 ใช้ 6 mm²) · แรงดันตกไม่ควรเกิน 5% · ตัวอย่างนี้วาดเส้นเดียวแทนตัวนำ 1 เส้น',
+  pfcr:'ตัวควบคุม PF: วัด P และ Q ที่จุดจ่ายไฟ (ช่อง "วัดที่") แล้วสับ/ปลดคาปาซิเตอร์ทีละสเต็ปผ่านรีเลย์ C–Q1..Q4 ไปยังขดคอนแทกเตอร์ ให้ PF เข้าใกล้เป้าหมาย · ปลดแล้วต้องรอคายประจุก่อนสับซ้ำ · ไฟเลี้ยง L–N 230 V',
   capbank:'คาปาซิเตอร์แบงก์ต่อเดลต้า จ่ายกำลังรีแอกทีฟ (kvar) ชดเชยโหลดเหนี่ยวนำ เช่น มอเตอร์ ทำให้ตัวประกอบกำลังดีขึ้น กระแสในสายลดลง และลดค่าปรับ PF ต่ำ',
   scope:'ออสซิลโลสโคปวาดแรงดันตามเวลา: ต่อโพรบ CH1/CH2 กับจุดที่ต้องการวัด และคลิปกราวด์ (⏚) กับจุดอ้างอิง · คลิกที่ตัวเครื่องเพื่อเปิดหน้าจอเต็ม · ใช้ Auto Set ให้ปรับสเกลเอง · ⚠ เครื่องตั้งโต๊ะต่อกราวด์โพรบลงสายดิน ห้ามคลิปกราวด์กับสาย L — จะลัดวงจรผ่านสายดิน (ใช้หม้อแปลงแยกวงจรหรือโพรบดิฟเฟอเรนเชียล)',
   pmeter:'พาวเวอร์มิเตอร์วัดแรงดัน กระแส กำลังจริง (W) กำลังรีแอกทีฟ (var) ตัวประกอบกำลัง และพลังงานสะสม (kWh) · ต่อ L และ N เข้าด้านบน ออกด้านล่าง',
@@ -5978,6 +6038,11 @@ function compHTML(c){
     } break;
     case 'rcd': add('กระแสผ่าน', fmt(R.I, 'A')); add('กระแสรั่ว (L + N)', fmt(R.idiff, 'A')); add('ตัดเมื่อรั่ว ≥', fmt(c.IdN, 'A'));
       st.push(c.on ? tag('ok','ON') : c._trip === 'rcd' ? tag('bad','ตัดเพราะไฟรั่ว') : c._trip ? tag('bad','ตัดเพราะกระแสเกิน') : tag('warn','OFF')); break;
+    case 'pfcr': { const sz = String(c.steps || '').split(/[ ,]+/).map(Number);
+      add('ไฟเลี้ยง', c._pw ? 'มี' : 'ไม่มี (ต่อ L–N 230 V)'); if (c._pf != null) add('PF ที่วัดได้', Math.abs(c._pf).toFixed(3) + (c._q < 0 ? ' (นำหน้า)' : ' (ล้าหลัง)') + ' → เป้า ' + (+c.pft || 0.95));
+      if (c._p != null) add('P / Q ที่จุดวัด', fmt(c._p, 'W') + ' / ' + fmt(c._q, 'var'));
+      add('สเต็ปที่สับอยู่', [0, 1, 2, 3].map(k => 'Q' + (k + 1) + ' ' + (sz[k] || 0) + ' kvar ' + (c._st && c._st[k] ? '●' : '○')).join(' · '));
+      if (!S.comps.some(o => o.n === c.meas && ['src1', 'src3', 'pmeter', 'rcd'].includes(o.t))) st.push(tag('bad', 'ไม่พบอุปกรณ์วัด "' + esc(c.meas || '') + '"')); } break;
     case 'pmeter': { const Sx = Math.hypot(R.P, R.Q);
       add('แรงดัน', fmt(R.V, 'V')); add('กระแส', fmt(R.I, 'A')); add('กำลังจริง P', fmt(R.P, 'W')); add('กำลังรีแอกทีฟ Q', fmt(R.Q, 'var')); add('กำลังปรากฏ S', fmt(Sx, 'VA'));
       add('ตัวประกอบกำลัง', Sx > 0.5 ? (Math.abs(R.P)/Sx).toFixed(3) + (R.Q > 0 ? ' (ล้าหลัง)' : R.Q < 0 ? ' (นำหน้า)' : '') : '—');
@@ -9416,7 +9481,7 @@ const PAL = [
   ['มอเตอร์', ['motor1','motor3','motor6','dcm','pump','servo']],
   ['ขับเคลื่อนมอเตอร์ (อินเวอร์เตอร์)', ['vfd']],
   ['ควบคุมมอเตอร์ (รีเลย์/คอนแทกเตอร์)', ['coil','tmr','no','nc','k3']],
-  ['เครื่องวัด', ['am','vm','pmeter','scope']],
+  ['เครื่องวัด', ['am','vm','pmeter','scope','pfcr']],
   ['อิเล็กทรอนิกส์', ['led','diode','zener','npn','pnp','nmos','opto','ne555','seg7','rgb','buzzer','pot']],
   ['ไมโครคอนโทรลเลอร์', ['uno','esp32','pico','lcd']],
   ['เซนเซอร์ (บอร์ด)', ['ldr','ntc','pir','sr04','dht','soil']],

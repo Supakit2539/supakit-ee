@@ -320,6 +320,9 @@ const path = require('path');
       s.load('dol'); const g = s.find('การไฟฟ้า'); Object.assign(g, {kva:5, zpct:4, xr:3}); const st = s.find('START'); st._pr = true; s.poke(); s.run(0.1);
       const vt = () => Math.min(...[0, 1, 2].map(k => rms(sub(s.RES.comp[g.id].pv[k], s.RES.comp[g.id].pv[3])))); const v0 = vt(); st._pr = false; s.poke(); s.run(5); o.tz.push([+v0.toFixed(1), +vt().toFixed(1)]);
       s.load('pfc'); const h = s.find('การไฟฟ้า'); applyModel(h, 'thhome'); s.run(1); INR.fix = 90; s.find('S1').on = true; s.solveNow(); s.run(0.05); INR.fix = null; o.tz.push([Math.round(s.find('C1')._inr.pk), Math.round(s.find('C1')._inr.f0)]); }
+    // ตู้ PFC อัตโนมัติ: PF 0.82 → ≥ 0.95 ภายใน 8 s, สตาร์ท M3 (S1) → กลับมา ≥ 0.95, ไม่นำหน้า, มีกระแสกระชากตอนสับสเต็ป, ไม่มีคำเตือน
+    { s.load('pfcauto'); s.run(2.2); const p = s.find('PFC1'), pf0 = p._pf; s.run(7); const pf1 = p._pf, st1 = p._st.map(x => x ? 1 : 0).join('');
+      s.find('S1').on = true; s.solveNow(); s.run(12); o.pfa = [+pf0.toFixed(3), +pf1.toFixed(3), st1, +p._pf.toFixed(3), p._q > 0, s.S.comps.some(c => c.t === 'capbank' && c._inr && c._inr.pk > 100), warnList().length]; }
     s.load('arduino'); s.run(1.2); o.pwmSw = scopeSwitchers().map(x => [x.f, Math.round(x.duty*100)/100]);
 
     o.mcuErr = ['arduino','esp32','pico','ardsense','espgarden','counter','motor'].map(k => (s.load(k), s.run(0.3), s.find('U1')._vm.err)).filter(Boolean);
@@ -343,6 +346,8 @@ const path = require('path');
   checks.push(['สโคปแบบไหล: ไม่ทริก ภาพเลื่อนตามเวลาจำลอง, CH1 ยอด 16.9 V, CH2 พัลส์ NE555 สูงสุด ≈ 8.85 V, ป้าย FLOW', r.sflow[0] && !r.sflow[1] && r.sflow[2] === 16.9 && Math.abs(r.sflow[3] - 8.85) < 0.1 && r.sflow[4] && r.sflow[5], JSON.stringify(r.sflow)]);
   checks.push(['หม้อแปลงจ่ายไฟ: 160 kVA Isc ≈ 5.8 kA ไม่เตือน, 500 kVA → MCB Icu 6 kA ไม่พอ, 5 kVA แรงดันตกตอนสตาร์ทมากกว่าตอนเดิน, ไฟบ้าน Isc 1.8 kA กระชาก C1 ≈ 100–200 A สั่น ≈ 1 kHz',
     Math.abs(r.tz[0][0] - 5774) < 30 && !r.tz[0][1] && r.tz[1][1] && r.tz[2][0] < r.tz[2][1] - 2 && r.tz[3][0] > 80 && r.tz[3][0] < 250 && r.tz[3][1] > 700 && r.tz[3][1] < 1500, JSON.stringify(r.tz)]);
+  checks.push(['ตู้ PFC อัตโนมัติ (pfcauto): PF 0.82 → ≥ 0.95, สตาร์ท M3 แล้วปรับสเต็ปจน ≥ 0.95 ไม่นำหน้า, มีกระแสกระชาก > 100 A ตอนสับ, ไม่มีคำเตือน',
+    Math.abs(r.pfa[0] - 0.823) < 0.01 && r.pfa[1] >= 0.95 && r.pfa[3] >= 0.95 && r.pfa[4] && r.pfa[5] && r.pfa[6] === 0, JSON.stringify(r.pfa)]);
   checks.push(['dol: K1 ดูด', r.dolCoil === true, r.dolCoil]);
   near('dol: กระแสสตาร์ท ≈ 6 × In (15.3 A)', r.dolInrush, 15.3, 0.2);
   for (let k = 0; k < 3; k++) near('dol: กระแสเฟส ' + (k + 1) + ' หลังเร่งเครื่อง 2.55 A', r.dolI[k], 2.55, 0.02);

@@ -91,6 +91,9 @@ PLC (แลดเดอร์ + ข้อความ), HMI ผ่าน RS-485,
    - **หม้อแปลงจ่ายไฟ** (`src1`/`src3` ฟิลด์ `kva` ว่าง = อุดมคติเหมือนเดิม, `zpct` Uk %, `xr`): `srcZ(c)` → Z = %Z·V²/S (1 เฟส = ทั้งลูป, 3 เฟส = ต่อเฟส), R + jX ใส่ใน `V(p, m, j, vr, vi, rs, xs)` (AC มี X)
      · แผงขวา `srcRows`: Z, Isc, กระแสพิกัด/ใช้อยู่ %, แรงดันตก (เตือน > 5/10%) · `sysIsc()` ตรวจ `mcb.icu` (kA, รุ่นใน MODELS) · กระแสกระชากใช้ L ของหม้อแปลง (`inrSrc`)
      · รุ่น: src1 `thhome` (Isc ≈ 1.8 kA), src3 `tr160`/`tr500`/`tr1000`
+   - **ตัวควบคุม PF อัตโนมัติ** `pfcr` (L C / N Q1–Q4; `meas` ชื่อแหล่งจ่าย/มิเตอร์, `pft`, `steps` kvar 4 สเต็ป, `delay`, `dis` เวลาคายประจุ, `auto`): `pfcTick` ต้น `discrete`
+     อ่าน P/Q (`pfcPQ`, บวก = จ่ายให้โหลด) → เลือกชุดสเต็ปจาก 16 แบบ (ต่ำกว่าเป้าเสียตามที่ขาด, นำหน้าเสีย 2 เท่า, +0.05 ต่อสเต็ปที่เปลี่ยน) ต้องต้องการต่อเนื่อง `delay` s → เปลี่ยนทีละสเต็ป (สับก่อนปลด)
+     หน้าสัมผัส C–Qk ใน stamp (`c._st`, ต้องมีไฟเลี้ยง `c._pw` ≥ 180 V) · ตัวอย่าง `pfcauto` (หม้อแปลง 160 kVA, มอเตอร์ 3 ตัว, แบงก์ 2.5/5/5/10 kvar ผ่าน K1–K4, M3 ผ่าน K10/S1)
    - วนแก้ซ้ำสำหรับสถานะพีชคณิต: LED on/off/เสีย, รอยต่อ PN (`JUNC`), BJT, MOSFET, 78xx, ออปโต, หลอดขาด, คอยล์ไหม้, PSU on/โหลดเกิน, ทรานสมิตเตอร์ 4–20 mA
    - ผลลัพธ์อยู่ใน `RES.comp[id]` (`v`,`i` = {d,r,i}, `Vr`,`Ir` = RMS, `P`,`Q`, `ac`; บล็อกมีฟิลด์เฉพาะ เช่น `ph`, `Iph`, `pw`, `inp`),
      `RES.wire`, `RES.src`, `RES.nvv` (แรงดันโหนด), `RES.net` (เส้นสายที่ต่อถึงกันด้วยสายไฟล้วน ใช้ตรวจ RS-485)
@@ -159,7 +162,7 @@ PLC (แลดเดอร์ + ข้อความ), HMI ผ่าน RS-485,
    - ลูปหลัก `frame()` แบ่งเวลาเป็นช่วงละ ≤ 0.05 s ตามความเร็วจำลองที่เลือก
 6. **State/ประวัติ** — `ser()`, `load()`, `commit()`, `pushHist()`, `undo()`; บันทึกลง localStorage คีย์ `circuit-board-v2`
    ฟิลด์ที่ขึ้นต้นด้วย `_` เป็นสถานะรันไทม์ ไม่ถูกบันทึก
-7. **ตัวอย่าง** — `EX` (series, parallel, mixed, led, home, dol, plcpump, arduino, esp32, pico, ardsense, espgarden, plcsense, indsense, rs485, lora, rs232, modbus, plc2port, hmimodbus, modbustcp, esp32wifi, lcdi2c, rectifier, halfwave, rccharge, logic, flipflop, opamp, opamposc, chaser, cnt7seg, shift595, lm317, tempalarm, ceamp, semi, timer555, pidtank, counter, motor, stardelta, rcdtest, pfc, stair, factory, seqconv, gate, pickplace, lift, elevator, osc, oscxy, oscprobe, blank) — dol/stardelta/plcpump/pico มีฉาก 3D ผูกมาด้วย สร้างด้วย `build((C,W)=>…)`
+7. **ตัวอย่าง** — `EX` (series, parallel, mixed, led, home, dol, plcpump, arduino, esp32, pico, ardsense, espgarden, plcsense, indsense, rs485, lora, rs232, modbus, plc2port, hmimodbus, modbustcp, esp32wifi, lcdi2c, rectifier, halfwave, rccharge, logic, flipflop, opamp, opamposc, chaser, cnt7seg, shift595, lm317, tempalarm, ceamp, semi, timer555, pidtank, counter, motor, stardelta, rcdtest, pfc, pfcauto, stair, factory, seqconv, gate, pickplace, lift, elevator, osc, oscxy, oscprobe, blank) — dol/stardelta/plcpump/pico มีฉาก 3D ผูกมาด้วย สร้างด้วย `build((C,W)=>…)`
 8. **การวาด** — canvas, `drawTwo()` (อุปกรณ์ 2 ขั้ว, วาดในพิกัดท้องถิ่นที่หมุนแล้ว), `drawBlock()`, `labelTwo()`, `drawFlow()` (จุดกระแส: DC ไหลทางเดียว, AC แกว่งตามมุมเฟส)
    - สีสาย: L1 น้ำตาล, L2 ดำ, L3 เทา (ตามมุมเฟส), N/สายกลับฟ้า, DC + แดง
 9. **แผงขวา (inspector)** — `F` = สเปกฟิลด์ของแต่ละชนิด, `NOTES`, `compHTML()`, `warnList()`
@@ -353,6 +356,7 @@ NODE_PATH=$(npm root -g) node tests/circuit-lab.test.js
 - semi: 7805 = 5.00 V, ซีเนอร์ ≈ 5.11 V, S1 เปิด → NPN อิ่มตัว LED ≈ 8.5 mA · timer555: ≈ 1 Hz · counter: 1.5 s → เลข 1 · motor: กดปุ่ม → กระแสสตาร์ทสูงแล้วลดลง < 0.15 A เมื่อหมุน
 - กระแสกระชากสับ C1 (pfc): ที่ 90° ≈ 490 A (≈ 70×) สั่น ≈ 4.6 kHz, ที่ 0° ≈ 11 A, รีแอกเตอร์ 200 µH ≈ 160 A · เส้นทาง C1/S1/PM1/การไฟฟ้า · capbank 10 kvar 400 V ที่ 90° ≈ 1 kA 3 kHz, lr 100 µH ลดกว่าครึ่ง
 - หม้อแปลงจ่ายไฟ: 160 kVA 4% → Isc 5774 A; 500 kVA → เตือน MCB Icu 6 kA; 5 kVA dol สตาร์ท 212.9 V เดิน 228.3 V; pfc + thhome → กระชาก C1 128 A 1.08 kHz
+- pfcauto: PF 0.823 → ≥ 0.95 ใน 8 s, สับ S1 (M3) → ปรับจน ≥ 0.95 ไม่นำหน้า, กระชาก > 100 A, ไม่มีคำเตือน
 - ภาระทางกล: pfc M1 0/50/100/150% → 3.15 A PF 0.18 / PF 0.55 / 7.16 A PF 0.65 1440 rpm / 11.1 A PF 0.66 · dol 220% → มอเตอร์ติด เบรกเกอร์ตัด
 - stardelta: สตาร์ท ≈ 34 A, สตาร์ ≈ 4.8 A, หลัง 5 s เดลต้า ≈ 14.3 A, เฟสขาด → คราง + อุปกรณ์ป้องกันตัด, E-Stop → K1 หลุด
 - factory: กด START → สายพานวิ่ง; ผ่านไป 60 s `FXS.cnt` = โลหะ ≥ 5, ชิ้นงานอื่น ≥ 5, `miss` = 0, `wrong` = 0; กด STOP → สายพานหยุด
