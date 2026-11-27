@@ -767,6 +767,19 @@ const path = require('path');
       await pp.reload(); await pp.waitForTimeout(800); await pctx.setOffline(true); await pp.reload(); await pp.waitForTimeout(1200);
       pr.push(await pp.evaluate(() => typeof __sim === 'object' && __sim.S.comps.length > 0));
       checks.push(['แอปบนโทรศัพท์ (PWA): manifest "Circuit Lab" standalone, ไอคอน 192/512/maskable, service worker ทำงาน, ตัดเน็ตแล้วเปิดแอปได้', pr[0] && pr[1] === 'Circuit Lab' && pr[2] === 'standalone' && pr[3] && pr[4] && pr[5] && !perr.length, JSON.stringify([pr, perr])]);
+      // ปุ่มติดตั้ง 📲 + แถบชวนติดตั้ง: iPhone (แสดงวิธีเพิ่มไปยังหน้าจอโฮม) และ Android (จำลอง beforeinstallprompt)
+      const { devices } = require('playwright'), url = `http://127.0.0.1:${srv.address().port}/circuit-lab.html`, inst = {};
+      for (const [nm, dv] of [['ios', devices['iPhone 13']], ['and', devices['Pixel 7']]]){
+        const ic = await browser.newContext({...dv}), ip = await ic.newPage(); await ip.goto(url); await ip.waitForTimeout(500);
+        if (nm === 'and') await ip.evaluate(() => { const ev = new Event('beforeinstallprompt'); ev.prompt = () => { window.__prompted = true; }; ev.userChoice = Promise.resolve({outcome:'accepted'}); window.dispatchEvent(ev); });
+        await ip.waitForTimeout(3000);
+        const r = await ip.evaluate(() => [!document.querySelector('#bInst').hidden, !document.querySelector('#instbar').hidden, document.querySelector('header').scrollWidth <= innerWidth]);
+        await ip.tap('#instbar [data-ib="go"]'); await ip.waitForTimeout(300);
+        r.push(await ip.evaluate(nm => nm === 'ios' ? !document.querySelector('#modal').hidden && /หน้าจอโฮม/.test(document.querySelector('#modal').textContent) : window.__prompted === true && document.querySelector('#bInst').hidden, nm));
+        inst[nm] = r; await ic.close(); }
+      inst.file = await page.evaluate(() => [document.querySelector('#bInst').hidden, document.querySelector('#instbar').hidden]);
+      checks.push(['ปุ่ม 📲 ติดตั้งแอปที่ส่วนหัว + แถบชวนติดตั้งบนโทรศัพท์: iPhone → วิธีเพิ่มไปยังหน้าจอโฮม, Android → หน้าต่างติดตั้งของเบราว์เซอร์ แล้วปุ่มหายไป, เปิดจากไฟล์ไม่แสดง',
+        inst.ios.every(Boolean) && inst.and.every(Boolean) && inst.file.every(Boolean), JSON.stringify(inst)]);
     } finally { await pctx.close(); srv.close(); } }
   checks.push(['ไม่มี error ในหน้าเว็บ', errors.length === 0, errors.join(' | ')]);
 

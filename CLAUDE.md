@@ -14,6 +14,7 @@ PLC (แลดเดอร์ + ข้อความ), HMI ผ่าน RS-485,
 - แอปบนโทรศัพท์ (PWA): `circuit-lab.webmanifest`, `circuit-lab-sw.js` (service worker: HTML เครือข่ายก่อน/ไฟล์อื่นสำเนาในเครื่องก่อน รวมฟอนต์ Google, แคช `circuit-lab-vN` — เพิ่มเลขเมื่อเปลี่ยนรายการ CORE),
   `icons/circuit-lab-{192,512,maskable-512,apple-180}.png` · `pwaInit()` ใส่ลิงก์ manifest/ไอคอนและลงทะเบียน SW เฉพาะเมื่อเปิดผ่าน http(s) ที่ไม่ใช่ claude.ai (`pwaHost`);
   ปุ่มติดตั้ง (`beforeinstallprompt` → `pwaInstall`, iOS แสดงวิธี "เพิ่มไปยังหน้าจอโฮม") ในเมนูไฟล์ `#finstall` และ ⋯ เมนู · standalone ใช้ safe-area ที่ส่วนหัว
+  ปุ่มไอคอน 📲 ที่ส่วนหัว `#bInst` (โทรศัพท์แสดงเป็นไอคอนอย่างเดียว) + แถบชวนติดตั้ง `#instbar` บนโทรศัพท์ (ขึ้นหลัง 2.5 s, ✕ = เลื่อนไป 7 วันใน localStorage `circuit-lab-instbar`) — `pwaRefresh()` แสดงทั้งหมดเมื่อ `pwaCanInstall()`
 
 ## โครงสร้างโค้ด (ตามลำดับในไฟล์ `<script>`)
 1. **ค่าคงที่และชนิดอุปกรณ์** — `T` คือรีจิสทรีของอุปกรณ์ทุกชนิด (`nm` ชื่อไทย, `pre` คำนำหน้าชื่ออัตโนมัติ, `d` ค่าเริ่มต้น)
@@ -349,6 +350,7 @@ NODE_PATH=$(npm root -g) node tests/circuit-lab.test.js
 - ตัวเขียนโค้ด: พิมพ์ d → digitalWrite/digitalRead, Enter → digitalWrite(13, HIGH); เลือก 13, Tab → HIGH, "sv." (Servo sv;) → attach/write, ไม่เด้งในสตริง
 - ตัวตรวจโค้ด: ตัวอย่างทุกตัวไม่มีคำเตือน · จับ pinmode→pinMode, ขาด ;, atach→attach, HIHG→HIGH, = ในเงื่อนไข, +* บรรทัด 3, วงเล็บ/สตริงไม่ปิด · ชั้นสีตรงเคอร์เซอร์ (< 2 px)
 - PWA (เสิร์ฟ http ชั่วคราวในเทสต์): manifest standalone + ไอคอนครบ, service worker ทำงาน, ตัดเน็ตแล้วยังเปิดได้
+  · ปุ่ม 📲 + แถบชวนติดตั้ง: iPhone → วิธีเพิ่มไปยังหน้าจอโฮม, Android (จำลอง beforeinstallprompt) → prompt แล้วปุ่มหาย, file:// ไม่แสดง
 - CTU นับ 3 → C0, RST ล้าง · แลดเดอร์ CTU + MOV `(AI0+10)*2` = 30 · AQ0 := (CV0 + 1) * 10 = 40
 
 ## งานที่วางแผนไว้

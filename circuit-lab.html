@@ -278,10 +278,19 @@ button,select,.pi,summary{touch-action:manipulation}
   #fwrap{border-left:0;border-top:1px solid var(--line)}
 }
 #bMore,#more[hidden],#kbar{display:none}
+#bInst[hidden],#instbar[hidden]{display:none !important}
+#bInst{background:color-mix(in srgb,var(--accent) 14%,var(--panel2));border-color:var(--accent);color:var(--text);font-weight:600}
+#instbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(74px + env(safe-area-inset-bottom));z-index:31;display:flex;align-items:center;gap:10px;width:min(460px,calc(100% - 16px));
+  padding:10px 10px 10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.3);font-size:13px}
+#instbar img{width:44px;height:44px;border-radius:10px;flex:none}
+#instbar div{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.35}#instbar span{color:var(--muted);font-size:12px}
+#instbar .btn{flex:none}
 @media (display-mode:standalone){header{padding-top:calc(6px + env(safe-area-inset-top));padding-left:calc(8px + env(safe-area-inset-left));padding-right:calc(8px + env(safe-area-inset-right))}}
 @media (max-width:600px){
   header h1{display:none}
-  header>:not(#bPal):not(#bInsp):not(#bRun):not(#bMore){display:none !important}
+  header>:not(#bPal):not(#bInsp):not(#bRun):not(#bMore):not(#bInst){display:none !important}
+  #bInst{flex:0 0 auto;order:2;padding:4px 10px;font-size:0}
+  #bInst::before{content:'📲';font-size:18px}
   header{-webkit-mask-image:none;mask-image:none;padding-right:8px;justify-content:space-between}
   #bPal,#bInsp,#bRun,#bMore{flex:1 1 0;justify-content:center;min-width:0;padding:4px 6px}
   #bMore{display:inline-flex;order:2}
@@ -357,6 +366,7 @@ button,select,.pi,summary{touch-action:manipulation}
   <select id="spd" title="ความเร็วจำลอง"><option value="1" selected>×1</option><option value="5">×5</option><option value="20">×20</option></select>
   <button class="btn" id="bVal" title="แสดงค่า/แรงดัน/กระแสที่สัญลักษณ์อุปกรณ์">ค่า ▾</button>
   <button class="btn" id="bTheme" title="สลับธีม">ธีม</button>
+  <button class="btn cmp" id="bInst" title="ติดตั้งแอปลงเครื่อง (ใช้ออฟไลน์ได้)" hidden>📲 ติดตั้งแอป</button>
   <button class="btn cmp" id="bMore" title="เมนูทั้งหมด">⋯ เมนู</button>
 </header>
 <div id="more" hidden><div class="msheet"><div class="dclose"><span>เมนู</span><button class="btn" data-mclose="1">✕ ปิด</button></div><div id="mbody"></div></div></div>
@@ -377,6 +387,7 @@ button,select,.pi,summary{touch-action:manipulation}
 <input type="file" id="fopen" accept=".json,application/json" hidden>
 <div id="modal" hidden><div class="mbody"></div></div>
 <div id="toast" hidden></div>
+<div id="instbar" hidden><img src="icons/circuit-lab-192.png" alt=""><div><b>ติดตั้ง Circuit Lab ลงเครื่อง</b><span>เปิดจากไอคอนบนหน้าจอ ใช้งานออฟไลน์ได้</span></div><button class="btn on" data-ib="go">ติดตั้ง</button><button class="btn" data-ib="x" title="ไม่ต้องการตอนนี้">✕</button></div>
 <div id="rpt" hidden><div class="rbar"><b>รายงานผลการจำลอง</b><span class="anhint" id="rptmsg"></span><span style="flex:1"></span><button class="btn on" data-rp="print">🖨 พิมพ์ / บันทึกเป็น PDF</button><button class="btn" data-rp="html">⬇ ดาวน์โหลด .html</button><button class="btn" data-rp="x">ปิด</button></div><iframe id="rptf" title="รายงาน"></iframe></div>
 <div id="main">
   <nav id="pal"></nav>
@@ -9426,7 +9437,13 @@ const pwaHost = () => /^https?:$/.test(location.protocol) && !/claude\.ai|claude
 const pwaStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const pwaIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const pwaCanInstall = () => pwaHost() && !pwaStandalone() && (!!PWA_EV || pwaIOS());
-function pwaRefresh(){ const b = $('#finstall'); if (b) b.hidden = !pwaCanInstall(); }
+const IB_KEY = 'circuit-lab-instbar';
+function pwaRefresh(){ const ok = pwaCanInstall(); for (const id of ['finstall', 'bInst']){ const b = $('#' + id); if (b) b.hidden = !ok; }
+  const bar = $('#instbar'); if (!bar) return; let snooze = 0; try { snooze = +localStorage.getItem(IB_KEY) || 0; } catch (e){}
+  if (!ok) bar.hidden = true; else if (phone() && Date.now() > snooze && bar.hidden && !bar.dataset.shown){ bar.dataset.shown = 1; setTimeout(() => { if (pwaCanInstall()) bar.hidden = false; }, 2500); } }
+$('#bInst').onclick = () => pwaInstall();
+$('#instbar').addEventListener('click', e => { const b = e.target.closest('[data-ib]'); if (!b) return; $('#instbar').hidden = true;
+  if (b.dataset.ib === 'go') pwaInstall(); else { try { localStorage.setItem(IB_KEY, String(Date.now() + 7*86400e3)); } catch (er){} toast('ติดตั้งภายหลังได้จากปุ่ม 📲 ด้านบน'); } });
 async function pwaInstall(){
   if (PWA_EV){ PWA_EV.prompt(); try { const r = await PWA_EV.userChoice; toast(r.outcome === 'accepted' ? 'ติดตั้งแล้ว — เปิดจากไอคอน Circuit Lab บนหน้าจอ' : 'ยกเลิกการติดตั้ง'); } catch (e){} PWA_EV = null; pwaRefresh(); return; }
   if (pwaIOS()) modal(`<h3>ติดตั้งบน iPhone / iPad</h3><ol style="line-height:1.9;padding-left:20px"><li>เปิดหน้านี้ใน <b>Safari</b></li><li>แตะปุ่ม <b>แชร์</b> (สี่เหลี่ยมมีลูกศรขึ้น)</li><li>เลือก <b>เพิ่มไปยังหน้าจอโฮม</b> แล้วแตะ <b>เพิ่ม</b></li></ol><div class="row"><button class="btn on" data-m="close">เข้าใจแล้ว</button></div>`);

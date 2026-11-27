@@ -11,7 +11,9 @@
 ## ติดตั้งเป็นแอปบนโทรศัพท์ (PWA)
 1. เปิด GitHub Pages: **Settings → Pages → Build and deployment → Source: Deploy from a branch** เลือก branch และโฟลเดอร์ `/ (root)` แล้วกด Save
 2. เปิด `https://supakit2539.github.io/-/circuit-lab.html` บนโทรศัพท์
-3. Android (Chrome): **⋯ เมนู → 📲 ติดตั้งแอป** · iPhone/iPad (Safari): ปุ่มแชร์ → **เพิ่มไปยังหน้าจอโฮม**
+3. กดปุ่ม **📲** ที่แถบด้านบน หรือปุ่ม **ติดตั้ง** ในแถบที่ขึ้นด้านล่างจอ
+   - Android (Chrome): ขึ้นหน้าต่างติดตั้งของเบราว์เซอร์ → **ติดตั้ง**
+   - iPhone/iPad (Safari): แอปจะบอกวิธี — ปุ่มแชร์ → **เพิ่มไปยังหน้าจอโฮม**
 
 ใช้งานออฟไลน์ได้หลังเปิดครั้งแรก · ต้องการไฟล์ APK: นำ URL ไปสร้างที่ PWABuilder (pwabuilder.com) → Android
 
