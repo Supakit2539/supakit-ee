@@ -7454,6 +7454,18 @@ function scopeRecord(){
     while (h.length > 2 && h[0].t < simT - 45) h.shift();
   }
 }
+// แบบไหล (c.flow = '1', Time/div < 0.1 s, Y–T): จอ 10 ช่อง = ช่วงเวลาล่าสุดจนถึง "ตอนนี้" ไม่ทริก รูปคลื่นสร้างจากเฟเซอร์ที่บันทึกทุก step (c._hist[].c)
+const scFlow = c => c.flow === '1' && c.tdiv < 0.1 && (c.disp || 'yt') === 'yt';
+function scFlowVal(c, k, ta, trw){
+  if (trw && trw(k)) return trw(k)(ta);
+  const h = c._hist || []; if (!h.length) return NaN; let lo = 0, hi = h.length - 1;
+  if (h[hi].t < ta) lo = hi; else { while (lo < hi){ const m = (lo + hi) >> 1; if (h[m].t >= ta) hi = m; else lo = m + 1; } }   // step ที่ครอบเวลา ta
+  const e = h[lo]; if (lo === 0 && e.t > ta + 0.06) return NaN;                                                                    // ก่อนเริ่มบันทึก
+  let v = e.d[k]; if (e.c){ const [r, i] = e.c[k]; v += Math.SQRT2*Math.hypot(r, i)*Math.sin(2*Math.PI*(RES.f || 50)*ta + Math.atan2(i, r)); }
+  const o = scCp(c, k), E = INR.ev;                                                                                                // โพรบกระแสบนเส้นทางที่เพิ่งสับตัวเก็บประจุ
+  if (o && E && E.tr.length === 1 && E.comps.has(o.id) && ta >= E.tEv && ta - E.tEv < 0.05){ const q = E.comps.get(o.id); v += q.s*E.tr[0](ta - E.tEv); }
+  return v; }
+function scopeFlowTick(){ const c = S.comps.find(x => x.id === scopeWin && x.t === 'scope'); if (!c || c.run === false || !scFlow(c)) return; c._cap = scopeCapture(c, c._sws || [], null); scopeLive(); }
 function scopeRefresh(){
   const scs = S.comps.filter(c => c.t === 'scope'); if (!scs.length) return;
   const fast = scs.filter(c => c.run !== false && c.tdiv < 0.1);
@@ -7477,12 +7489,12 @@ function scopeRefresh(){
         if (hi && lo && Math.abs(hi[k] - lo[k]) > 0.05) return {e, hi:hi[k], lo:lo[k]}; } return null; });
       if (bs[0] || bs[1]) bur.set(c.id, bs); }
   }
-  for (const c of scs) if (c.run !== false || !c._cap) c._cap = scopeTrigHold(c, scopeCapture(c, sws, bur.get(c.id)));
+  for (const c of scs){ if (scFlow(c)) c._sws = sws; if (c.run !== false || !c._cap) c._cap = scopeTrigHold(c, scopeCapture(c, sws, bur.get(c.id))); }
 }
 // โหมดทริก: Auto = วาดเสมอ · Normal = ไม่ทริก → ค้างภาพล่าสุดที่ทริกได้ (ยังไม่เคยทริก = จอว่าง) · Single = ทริกครั้งแรกแล้วหยุด (STOP)
 function scopeTrigHold(c, cap){
   const tm = c.tmode || 'auto';
-  if (!cap || tm === 'auto' || c.disp === 'fft' || (cap.roll && c.disp === 'xy')) return cap;
+  if (!cap || tm === 'auto' || cap.flow || c.disp === 'fft' || (cap.roll && c.disp === 'xy')) return cap;
   if (cap.trig){ cap.wait = false; if (tm === 'single'){ c.run = false; cap.done = true; } return cap; }
   const old = c._cap;
   if (old && old.trig && old.roll === cap.roll && tm === 'norm'){ old.wait = true; return old; }
@@ -7510,8 +7522,12 @@ function scopeCapture(c, sws, bs){
     const trf = TR.active && TR.tw && c._n ? [scTr(c, 0), scTr(c, 1)] : null, trw = trf && (trf[0] || trf[1]) ? (k => trf[k]) : null;
     const trPer = trw ? Math.max(...[0, 1].map(k => chs[k].A ? 1/chs[k].f : 0)) : 0, trTs = trPer ? Math.min(trPer*1.5, T*4) : 0, trB = simT - T - trTs;
     // มีเฟรมอนุกรมบนโพรบ: วาดบิตจริงตามเวลา (จุดทริก = start bit ที่ 1 ช่องจากซ้าย)
-    const main = bs && (bs[c.trig === '2' ? 1 : 0] || bs[0] || bs[1]), base = main ? main.e.t0 - 0.1*T : 0;
-    const fn = (k, t) => { if (main && bs[k]){ const b = bs[k], v = waveBit(b.e, base + t) ? b.hi : b.lo; return cpl(k) ? v - (b.hi + b.lo)/2 : v; }
+    const flow = scFlow(c), main = !flow && bs && (bs[c.trig === '2' ? 1 : 0] || bs[0] || bs[1]), base = main ? main.e.t0 - 0.1*T : 0;
+    const fn = (k, t) => { if (flow){ const ch = chs[k], ta = simT + t;
+        // สัญญาณสวิตชิ่ง (PWM/NE555/เซอร์โว): ระดับ HIGH/LOW จริงสลับตามเวลา · อื่น ๆ จากประวัติเฟเซอร์
+        const v = ch.sw ? ch.sw.lo + (ch.sw.hi - ch.sw.lo)*((((ta*ch.sw.f) % 1) + 1) % 1 < ch.sw.duty ? 1 : 0) + (ch.A ? ch.A*Math.sin(2*Math.PI*ch.f*ta + ch.ph) : 0) : scFlowVal(c, k, ta, trw);
+        return cpl(k) ? v - ch.mean : v; }
+      if (main && bs[k]){ const b = bs[k], v = waveBit(b.e, base + t) ? b.hi : b.lo; return cpl(k) ? v - (b.hi + b.lo)/2 : v; }
       if (trw && trw(k)){ const v = trw(k)(trB + t); return cpl(k) ? v - chs[k].mean : v; }
       if (step && t < 0){ const v = step[k]; return cpl(k) ? v - chs[k].mean : v; }
       const ch = chs[k], tt = simT + t;
@@ -7521,7 +7537,8 @@ function scopeCapture(c, sws, bs){
     // ทริกเกอร์: หาจุดตัดระดับ (ขาขึ้น/ขาลง) แรกในช่วงหนึ่งคาบที่ยาวที่สุด
     const tk = c.trig === '2' ? 1 : 0, tc = chs[tk], per = Math.max(tc.sw ? 1/tc.sw.f : 0, tc.A ? 1/tc.f : 0);
     let t0 = 0;
-    if (main && main.e.segs){ cap.trig = true; cap.tpos = 1; const e = main.e;
+    if (flow){ t0 = -T; cap.flow = true; }
+    else if (main && main.e.segs){ cap.trig = true; cap.tpos = 1; const e = main.e;
       cap.uart = Object.assign({baud:0, n:0, hex:'', dur:e.dur, from:(e.key.c.n || '') + ' (' + e.key.p + ')'}, e.dec); }
     else if (main){ cap.trig = true; cap.tpos = 1; const e = main.e;
       cap.uart = {proto:'UART 8N1', baud:e.baud, n:e.bytes.length, dur:e.bytes.length*10/e.baud, from:(e.key.c.n || '') + (e.key.p === 'ro' ? ' (RO)' : e.key.p === 'drv' ? ' (บัส A/B)' : ''),
@@ -7754,7 +7771,7 @@ function scopeHeadline(c){
   if (c.disp === 'fft') return ['FFT CH' + (c.fftch === '2' ? 2 : 1), 'ช่วง 0–' + fmt(cap && cap.fft ? cap.fft.span : 0, 'Hz'), (c.fref ?? 30) + ' dBV บนสุด · 10 dB/div', cap && cap.fft ? 'ความละเอียด ' + fmt(cap.fft.df, 'Hz') : '', 'Hann', c.run === false ? 'STOP' : 'RUN'].filter(Boolean).join('   ');
   const mo = scMath(c);
   return [ch(0), c.on2 !== false ? ch(1) : null, mo ? `M ${mo[0]} ${fmtDiv(c.vdivm, scU(c, 2))}/div` : null, fmtDiv(c.tdiv, 's') + '/div',
-    cap && cap.roll && tm === 'auto' ? 'ROLL' : `${SC_TM[tm]} CH${c.trig === '2' ? 2 : 1} ${c.slope === 'down' ? '↓' : '↑'} ${fmt(c.tlev, scU(c, c.trig === '2' ? 1 : 0))}` + (cap && !cap.roll && tm === 'auto' && !cap.trig ? ' (ไม่ทริก)' : ''),
+    cap && cap.flow ? 'ไหล (FLOW)' : cap && cap.roll && tm === 'auto' ? 'ROLL' : `${SC_TM[tm]} CH${c.trig === '2' ? 2 : 1} ${c.slope === 'down' ? '↓' : '↑'} ${fmt(c.tlev, scU(c, c.trig === '2' ? 1 : 0))}` + (cap && !cap.roll && tm === 'auto' && !cap.trig ? ' (ไม่ทริก)' : ''),
     st].filter(Boolean).join('   ');
 }
 function scopeMeasHTML(c){
@@ -7829,6 +7846,7 @@ function scopeUI(){
       <label>CH1 Coupling${sel('cpl1', ['DC','AC'], v => v)}</label>
       <label>CH1 โพรบ${psel(1)}</label>
       <label>Time/div${sel('tdiv', SC_T, v => fmtDiv(v, 's') + (v >= 0.1 ? ' (roll)' : ''))}</label>
+      <label>การกวาด${sel('flow', ['0', '1'], v => v === '1' ? 'ไหลตามเวลา (ไม่ทริก)' : 'ทริก (ภาพนิ่ง)')}</label>
       <label><span style="color:${SC_COL[1]}">CH2 ${scU(c, 1)}/div</span>${sel('vdiv2', vlist(2), v => fmtDiv(v, scU(c, 1)))}</label>
       <label>CH2 ตำแหน่ง (div)<input type="range" min="-4" max="4" step="0.5" data-sc="pos2" value="${c.pos2}"></label>
       <label>CH2 Coupling${sel('cpl2', ['DC','AC'], v => v)}</label>
@@ -9724,7 +9742,7 @@ $('#bRun').onclick = () => setRunning(!running);
 function frame(now){
   const sp = running ? +$('#spd').value : 0, dt = Math.min(0.1, Math.max(0, (now - last)/1000)); last = now;
   if (sp > 0){ let t = dt*sp; while (t > 1e-6){ const h = Math.min(0.05, t); step(h); t -= h; } } else settle();
-  draw(now); fxDraw(); if (running && LG.on && LG.roll) lgDraw();                                  // กราฟสดแบบไหล: วาดทุกเฟรมให้เลื่อนลื่น
+  draw(now); fxDraw(); if (running && LG.on && LG.roll) lgDraw(); if (running && scopeWin) scopeFlowTick();                                  // กราฟสดแบบไหล: วาดทุกเฟรมให้เลื่อนลื่น
   if (now - lastUI > 200){ lastUI = now; scopeRefresh(); lgDraw(); liveUI(); if (ladOpen) ladMon(); fxHud(); if (scopeWin) scopeLive(); }
   requestAnimationFrame(frame);
 }

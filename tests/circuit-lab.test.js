@@ -310,6 +310,10 @@ const path = require('path');
         s.run(1); INR.fix = 90; ['Q1', 'Q2', 'Q3'].forEach(n => s.find(n).on = true); s.solveNow(); s.run(0.05); const cb = s.find('CB1');
         sel = {k:'c', c:s.find('การไฟฟ้า')}; LG.on = true; LG.lock = null; LG.win = '2c'; lgDraw(); return [Math.round(cb._inr.pk), Math.round(cb._inr.f0), !!LG.evlab]; };
  o.inr.push([...INR.ev.comps.keys()].map(id => s.S.comps.find(x => x.id === id).n).sort().join(','), Math.round(INR.ev.f0)); o.cbinr = [cbSw(0), cbSw(100)]; INR.fix = null; }
+    // สโคปแบบไหล: osc 5 ms/div ไม่ทริก ภาพเลื่อนตามเวลา, CH1 ไซน์ ±16.9 V, CH2 พัลส์ NE555 0–8.85 V
+    { s.load('osc'); s.run(1); const c = s.find('OSC1'); c.flow = '1'; c.tdiv = 0.005; let cp = s.scope('OSC1'); const a = Array.from(cp.ch[0].vc.slice(0, 50));
+      s.run(0.01); cp = s.scope('OSC1'); const moved = Array.from(cp.ch[0].vc.slice(0, 50)).some((v, i) => Math.abs(v - a[i]) > 2);
+      o.sflow = [cp.flow, cp.trig, +cp.ch[0].max.toFixed(1), +cp.ch[1].max.toFixed(2), moved, /FLOW/.test(scopeHeadline(c))]; }
     s.load('arduino'); s.run(1.2); o.pwmSw = scopeSwitchers().map(x => [x.f, Math.round(x.duty*100)/100]);
 
     o.mcuErr = ['arduino','esp32','pico','ardsense','espgarden','counter','motor'].map(k => (s.load(k), s.run(0.3), s.find('U1')._vm.err)).filter(Boolean);
@@ -330,6 +334,7 @@ const path = require('path');
     r.cbinr[0][0] > 700 && r.cbinr[0][0] < 1400 && r.cbinr[0][1] > 2500 && r.cbinr[0][1] < 3500 && r.cbinr[0][2] && r.cbinr[1][0] < r.cbinr[0][0]/2, JSON.stringify(r.cbinr)]);
   checks.push(['กระแสกระชากสับตัวเก็บประจุ: ที่ยอดแรงดัน ≈ 300–600 A, ที่ศูนย์ < 40 A, รีแอกเตอร์ 200 µH ลดเหลือ < 1/2 · เส้นทาง C1/S1/PM1/แหล่งจ่าย',
     r.inr[0] > 300 && r.inr[0] < 600 && r.inr[1] < 40 && r.inr[2] < r.inr[0]/2 && r.inr[3] === ['C1', 'PM1', 'S1', 'การไฟฟ้า'].sort().join(','), JSON.stringify(r.inr)]);
+  checks.push(['สโคปแบบไหล: ไม่ทริก ภาพเลื่อนตามเวลาจำลอง, CH1 ยอด 16.9 V, CH2 พัลส์ NE555 สูงสุด ≈ 8.85 V, ป้าย FLOW', r.sflow[0] && !r.sflow[1] && r.sflow[2] === 16.9 && Math.abs(r.sflow[3] - 8.85) < 0.1 && r.sflow[4] && r.sflow[5], JSON.stringify(r.sflow)]);
   checks.push(['dol: K1 ดูด', r.dolCoil === true, r.dolCoil]);
   near('dol: กระแสสตาร์ท ≈ 6 × In (15.3 A)', r.dolInrush, 15.3, 0.2);
   for (let k = 0; k < 3; k++) near('dol: กระแสเฟส ' + (k + 1) + ' หลังเร่งเครื่อง 2.55 A', r.dolI[k], 2.55, 0.02);
