@@ -7891,13 +7891,24 @@ function spBuild(){
   const node = (x, y) => { const r = find(key(x, y)); let v = idx.get(r); if (v === undefined){ v = ++nn; idx.set(r, v); } return v; };
   const net = {els:[], nn:0, nb:0, unsup:[], comp:new Map(), pins:new Map(), dig:[], links:[]};
   const pinN = new Map();
-  for (const c of S.comps){ if (!SP_OK.has(c.t)){ net.unsup.push(c); continue; } pinN.set(c, pinsOf(c).map(p => node(p[0], p[1]))); }
+  // โหลด 2 ขั้วที่ไม่มีแบบจำลอง SPICE (มอเตอร์, หลอดฟลูออเรสเซนต์, คอยล์, หน้าสัมผัส ฯลฯ) → อิมพีแดนซ์เทียบเท่าที่สถานะปัจจุบัน (admit ที่ความถี่ไฟ)
+  const f0 = (S.comps.find(c => c.t === 'src1' || c.t === 'acs') || {}).f || 50, w0 = 2*Math.PI*f0; net.eq = [];
+  for (const c of S.comps){ let ok = SP_OK.has(c.t) || c.t === 'pmeter';
+    if (!ok && isTwo(c)){ let y = null; try { y = admit(c, true, w0); } catch (e) {} if (y && isFinite(y[0]) && isFinite(y[1])){ c.__y = y; ok = true; net.eq.push(c.n || T[c.t].nm); } }
+    if (!ok){ net.unsup.push(c); continue; } pinN.set(c, pinsOf(c).map(p => node(p[0], p[1]))); }
   const newNode = () => ++nn, br = () => net.nb++;
   const add = (el, c, main) => { el.c = c; net.els.push(el); if (main) net.comp.set(c, el); return el; };
   const R = (a, b, G, c, main) => add({k:'R', a, b, G}, c, main);
   const link = (a, b) => net.links.push([a, b]);                                       // ต่อทาง DC (ใช้หาเกาะที่ลอย)
   for (const c of S.comps){ const n = pinN.get(c); if (!n) continue; net.pins.set(c, n);
     if (SP_TWO[c.t]){ add({k:c.t === 'lamp' ? 'LAMP' : 'R2', a:n[0], b:n[1]}, c, true); link(n[0], n[1]); continue; }
+    if (c.__y){ const [g, bb] = c.__y; delete c.__y; const m2 = Math.hypot(g, bb);
+        if (m2 < 1e-9){ add({k:'R', a:n[0], b:n[1], G:1e-9}, c, true); continue; }
+        const Rr = g/(m2*m2), X = -bb/(m2*m2), m = newNode();                     // Z = 1/Y = R + jX
+        if (Math.abs(X) < 1e-6*Math.max(Rr, 1e-6)){ add({k:'R', a:n[0], b:n[1], G:1/Math.max(Rr, 1e-6)}, c, true); link(n[0], n[1]); continue; }
+        R(n[0], m, 1/Math.max(Rr, 1e-6), c); link(n[0], m);
+        if (X > 0){ add({k:'L', a:m, b:n[1], j:br(), Lh:X/w0, Rs:1e-4}, c, true); link(m, n[1]); }
+        else add({k:'C', a:m, b:n[1], Cf:1/(w0*-X)}, c, true); continue; }
     switch (c.t){
       case 'cap': add({k:'C', a:n[0], b:n[1]}, c, true); break;
       case 'ind': add({k:'L', a:n[0], b:n[1], j:br()}, c, true); link(n[0], n[1]); break;
@@ -7922,6 +7933,7 @@ function spBuild(){
         } break;
       case 'scope': R(n[0], n[2], 1e-6/(c.px1 || 1), c); R(n[1], n[2], 1e-6/(c.px2 || 1), c); if (c.earth !== false){ R(n[2], 0, 10, c); link(n[2], 0); } link(n[0], n[2]); link(n[1], n[2]); break;
       case 'gnd': case 'lbl': break;
+      case 'pmeter': { const i = add({k:'R', a:n[0], b:n[2], G:1e4}, c, true); i.Li = 1; R(n[1], n[3], 1e4, c); link(n[0], n[2]); link(n[1], n[3]); } break;
       case 'spdt': add({k:'SPDT', n}, c, true); link(n[0], n[1]); link(n[0], n[2]); break;
       case 'pot': add({k:'POT', n}, c, true); link(n[0], n[1]); link(n[1], n[2]); break;
     }
@@ -7983,8 +7995,8 @@ function spLoad(net, st){
         el.i = BI(el.a, el.b, [el.a, el.b], fn); } break;
       case 'SPDT': G(el.n[0], el.n[1], c.pos === 'A' ? 1e3 : 1e-9); G(el.n[0], el.n[2], c.pos === 'B' ? 1e3 : 1e-9); break;
       case 'POT': { const ra = Math.max(1, c.R*c.pos/100), rb = Math.max(1, c.R*(1 - c.pos/100)); G(el.n[0], el.n[1], 1/ra); G(el.n[1], el.n[2], 1/rb); } break;
-      case 'C': { const Cf = (c.C || 0)*1e-6, v = Vn(el.a) - Vn(el.b); G(el.a, el.b, 1e-12); el.i = charge(el, 0, el.a, el.b, Cf*v, Cf); el.v = v; } break;
-      case 'L': { const L = c.Lh || 0, Rl = Math.max(c.R || 0, 1e-4), j = el.j, il = x[j];
+      case 'C': { const Cf = el.Cf ?? (c.C || 0)*1e-6, v = Vn(el.a) - Vn(el.b); G(el.a, el.b, 1e-12); el.i = charge(el, 0, el.a, el.b, Cf*v, Cf); el.v = v; } break;
+      case 'L': { const L = el.Lh ?? (c.Lh || 0), Rl = el.Rs ?? Math.max(c.R || 0, 1e-4), j = el.j, il = x[j];
         // v(a) − v(b) − R·i − dφ/dt = 0, φ = L·i
         if (el.a) { Mi(el.a - 1, j, 1); Mi(j, el.a - 1, 1); } if (el.b){ Mi(el.b - 1, j, -1); Mi(j, el.b - 1, -1); }
         Mi(j, j, -Rl); if (st.Cm) st.Cm[j*N + j] -= L;
@@ -8143,6 +8155,7 @@ function spProbes(net){
     const neg = SP_SRC.has(c.t);
     if (isTwo(c)){ L.push({id:'V(' + nm + ')', u:'V', a:n[0], b:n[1], c}); if (el) L.push({id:'I(' + nm + ')', u:'A', el, c, neg}); L.push({id:'P(' + nm + ')', u:'W', a:n[0], b:n[1], el, c, pw:true, neg}); }
     else { pl.forEach((p, k) => { if (p[2] && !(c.t === 'scope' && k === 2)) L.push({id:'V(' + nm + '.' + p[2] + ')', u:'V', a:n[k], b:0, c}); });
+      if (c.t === 'pmeter' && el) L.push({id:'I(' + nm + ')', u:'A', el, c}, {id:'P(' + nm + ')', u:'W', a:n[0], b:n[1], el, c, pw:true});
       if (neg && el){ L.push({id:'I(' + nm + ')', u:'A', el, c, neg}, {id:'P(' + nm + ')', u:'W', a:n[0], b:n[1], el, c, pw:true, neg}); }
       if (c.t === 'scope') L.push({id:'V(' + nm + '.CH1−⏚)', u:'V', a:n[0], b:n[2], c}, {id:'V(' + nm + '.CH2−⏚)', u:'V', a:n[1], b:n[2], c});
       if (el && (el.k === 'Q' || el.k === 'M' || el.k === 'OA' || el.k === 'REG' || el.k === 'L317' || el.k === 'XF' || el.k === 'D')) L.push({id:'I(' + nm + ')', u:'A', el, c}); } }
@@ -8161,7 +8174,7 @@ function spProbeVal(P, x){ const V = k => k ? x[k - 1] : 0, sg = P.neg ? -1 : 1;
 function spRun(opt){
   const t0 = performance.now(), net = spBuild(), probes = spProbes(net), Tk = opt.temp ?? 27;
   const sel = (opt.probes || []).map(id => probes.find(p => p.id === id)).filter(Boolean);
-  const out = {kind:opt.kind, net, probes, sel, unsup:net.unsup.map(c => c.n || T[c.t].nm), msg:[]};
+  const out = {kind:opt.kind, net, probes, sel, unsup:net.unsup.map(c => c.n || T[c.t].nm), eq:net.eq || [], msg:[]};
   if (opt.kind === 'op'){ const r = spOP(net, Tk); out.op = r; out.x = r.x; out.rows = spOpTable(net, r.x, Tk); }
   else if (opt.kind === 'dc'){
     const tgt = opt.param === 'temp' ? null : S.comps.find(c => c.n === opt.comp), key = opt.param, old = tgt ? tgt[key] : null, pts = Math.max(2, opt.pts | 0);
@@ -8283,8 +8296,8 @@ function spNetlist(){
       case 'LAMP': L.push(`R${nmC} ${nm(el.a)} ${nm(el.b)} ${(c.V*c.V/c.P).toPrecision(6)} ; หลอดไส้ (ค่าความต้านทานร้อน)`); break;
       case 'POT': L.push(`R${nmC}a ${nm(el.n[0])} ${nm(el.n[1])} ${Math.max(1, c.R*c.pos/100)}`, `R${nmC}b ${nm(el.n[1])} ${nm(el.n[2])} ${Math.max(1, c.R*(1 - c.pos/100))}`); break;
       case 'SPDT': L.push(`R${nmC}a ${nm(el.n[0])} ${nm(el.n[1])} ${c.pos === 'A' ? '1m' : '1G'}`, `R${nmC}b ${nm(el.n[0])} ${nm(el.n[2])} ${c.pos === 'B' ? '1m' : '1G'}`); break;
-      case 'C': L.push(`C${nmC} ${nm(el.a)} ${nm(el.b)} ${(c.C*1e-6).toPrecision(6)}`); break;
-      case 'L': L.push(`L${nmC} ${nm(el.a)} ${nm(el.b)} ${c.Lh} Rser=${Math.max(c.R || 0, 1e-4)}`); break;
+      case 'C': L.push(`C${nmC} ${nm(el.a)} ${nm(el.b)} ${(el.Cf ?? c.C*1e-6).toPrecision(6)}`); break;
+      case 'L': L.push(`L${nmC} ${nm(el.a)} ${nm(el.b)} ${(el.Lh ?? c.Lh).toPrecision(6)} Rser=${el.Rs ?? Math.max(c.R || 0, 1e-4)}`); break;
       case 'V': { const rs = c.t === 'bat' ? Math.max(c.ri || 0, 1e-4) : c.t === 'fgen' ? (c.zo ?? 50) : 0.05, mid = 'N' + nmC + '_i';
         let src = c.t === 'bat' ? `DC ${c.V}` : c.t === 'fgen' ? fgenSpice(c) : `SIN(0 ${(c.V*Math.SQRT2).toPrecision(6)} ${c.f || 50} 0 0 ${c.ph || 0}) AC 1`;
         L.push(`V${nmC} ${mid} ${nm(el.b)} ${src}`, `R${nmC}_s ${nm(el.a)} ${mid} ${rs}`); } break;
@@ -8377,6 +8390,7 @@ function anUI(){
 function anMsg(){ const r = AN.res; if (!r) return 'เลือกชนิดการวิเคราะห์และโพรบ แล้วกด ▶ จำลอง · แบบจำลองไม่เชิงเส้น (Shockley, Ebers–Moll, MOSFET Level 1, ออปแอมป์มาโครโมเดล) แก้ด้วย Newton–Raphson';
   const a = [`${AN_KIND[r.kind]} · ${r.ms.toFixed(0)} ms`];
   if (r.nstep) a.push(r.nstep + ' ขั้นเวลา'); if (r.mc) a.push(`Monte Carlo ${r.mc.length} รอบ (สุ่ม ${r.mcN} ชิ้น)`); if (r.op) a.push(r.op.ok ? `ลู่เข้า (${r.op.how}, ${r.op.it} รอบ)` : '<span class="e">ลู่เข้าไม่ได้</span>');
+  if (r.eq && r.eq.length) a.push(`<span>ใช้อิมพีแดนซ์เทียบเท่าที่สถานะปัจจุบัน (ความเร็ว/สวิตช์ ณ ตอนนี้): ${esc(r.eq.join(', '))}</span>`);
   if (r.unsup.length) a.push(`<span class="e">ไม่รวมในการวิเคราะห์: ${esc(r.unsup.join(', '))}</span>`); for (const m of r.msg) a.push(`<span class="e">${esc(m)}</span>`);
   return a.join(' · '); }
 // ---------- Monte Carlo: สุ่มค่า R/C/L ตามความคลาดเคลื่อน (เกาส์ σ = tol/3 ตัดที่ ±tol) แล้วจำลองซ้ำ ----------
@@ -9407,6 +9421,8 @@ $('#ftools').onclick = e => { const b = e.target.closest('[data-px]'); if (b) $(
 $('#bPal').onclick = () => drawer($('#main').classList.contains('palopen') ? null : 'pal');
 $('#bInsp').onclick = () => drawer($('#main').classList.contains('inspopen') ? null : 'insp');
 document.addEventListener('click', e => { const b = e.target.closest('[data-dclose]'); if (b) drawer(null); });
+// ปิดลิ้นชักตอนยกนิ้วด้วย: บางเครื่อง (Android) ไม่ส่ง click เมื่อแผ่นข้อมูลยังเลื่อน/อัปเดตอยู่
+document.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse' && e.target.closest('[data-dclose]')) drawer(null); });
 $('#bAn').onclick = () => { const w = $('#anwin'); if (w.hidden) anOpen(); else w.hidden = true; };
 $('#bVal').onclick = e => { const m = $('#vmenu'); if (!m.hidden){ m.hidden = true; return; } const r = e.currentTarget.getBoundingClientRect();
   m.querySelectorAll('[data-d]').forEach(x => x.checked = x.dataset.d === 'on' ? showVal : !!DISP[x.dataset.d]);
